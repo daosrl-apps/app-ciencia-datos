@@ -1,0 +1,12 @@
+# Servicio de carga del tablero DAO: pipeline + cargar_mes.py + cargador.py (solo Python y dos librerías)
+FROM python:3.12-slim
+RUN pip install --no-cache-dir openpyxl==3.1.5 xlrd==2.0.2
+WORKDIR /app
+COPY pipeline/ /app/pipeline/
+COPY servidor/cargador.py servidor/sesiones.py /app/servidor/
+RUN chmod -R a+rX /app           # el servicio corre con el usuario 1000: tiene que poder leer el código
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8000
+HEALTHCHECK --interval=60s --timeout=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/salud', timeout=4)"
+CMD ["python", "/app/servidor/cargador.py"]

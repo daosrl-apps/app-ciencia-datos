@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tablero DAO SRL</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: barra fija (marca + filtros globales) → pestañas de 7 secciones → contenido en grilla de tarjetas.
+   Dirección "Grafito financiero": neutro frío, un acento azul acero, cifras en Plex Mono. Oscuro por defecto. */
+:root{
+  --bg:#121417; --surface:#1a1d21; --surface-2:#20242a; --line:#2a2e34; --axis:#3a3f46;
+  --fg:#e6e8eb; --fg-2:#b9bfc7; --muted:#8b929b;
+  --accent:#5b9be0; --accent-ink:#0b1520; --accent-soft:rgba(91,155,224,.14);
+  --s-real:#5b9be0; --s-fx:#a3abb5; --s-b:#6b737d;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70;
+  --good:#3fb27f; --warn:#e3a33b; --bad:#e5686a; --bad-soft:rgba(229,104,106,.12); --warn-soft:rgba(227,163,59,.12); --good-soft:rgba(63,178,127,.12);
+  --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+  --r:6px;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f4f5f7; --surface:#ffffff; --surface-2:#f7f8fa; --line:#e1e4e8; --axis:#c5cad1;
+  --fg:#15181c; --fg-2:#3f4650; --muted:#5f6772;
+  --accent:#2563a8; --accent-ink:#ffffff; --accent-soft:rgba(37,99,168,.10);
+  --s-real:#2563a8; --s-fx:#8a929c; --s-b:#b4bac2;
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a;
+  --good:#1d8a5a; --warn:#a86b00; --bad:#c43c3f; --bad-soft:rgba(196,60,63,.08); --warn-soft:rgba(168,107,0,.09); --good-soft:rgba(29,138,90,.09);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--fg);font:14px/1.45 var(--font);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--surface)}
+button,select,input{font:inherit;color:inherit}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1440px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── Barra superior ── */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-row{display:flex;align-items:center;gap:16px;padding-block:10px}
+.brand{display:flex;flex-direction:column;line-height:1.15;margin-right:auto}
+.brand b{font-size:15px;font-weight:600;letter-spacing:.01em}
+.brand span{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.src{font-size:12px;color:var(--muted);text-align:right;max-width:340px}
+.src b{color:var(--fg-2);font-weight:500}
+.icon-btn{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;cursor:pointer;font-size:12px;color:var(--fg-2);white-space:nowrap}
+.icon-btn:hover{border-color:var(--axis);color:var(--fg)}
+#btn-filtros{display:none}
+.icon-btn .short{display:none}
+#btn-filtros[aria-expanded="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding-block:0 10px}
+.f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.f label,.f .lab{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+select{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:6px 28px 6px 10px;font-size:13px;appearance:none;cursor:pointer;max-width:100%;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+select:hover{border-color:var(--axis)}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:2px}
+.seg button{background:none;border:0;border-radius:4px;padding:5px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:500}
+.picker{border-top:1px solid var(--line);padding-block:10px;display:grid;gap:8px}
+.picker-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;color:var(--fg-2)}
+.picker-head b{font-weight:600;color:var(--fg)}
+.yr{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.yr>span{width:44px;font-size:12px;color:var(--muted)}
+.mchip{border:1px solid var(--line);background:var(--surface-2);border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;color:var(--fg-2);min-width:44px}
+.mchip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--fg)}
+.mchip:disabled{opacity:.35;cursor:not-allowed}
+.link{background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px;font-size:12px}
+.scope{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);padding-block:0 10px}
+.scope b{color:var(--fg-2);font-weight:500}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+
+/* ── Pestañas ── */
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--line)}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--fg)}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:500}
+.tab small{font-family:var(--mono);font-size:11px;color:var(--muted);margin-right:6px}
+
+/* ── Contenido ── */
+main{padding-block:18px 48px}
+section[hidden]{display:none}
+.sec-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px;margin-bottom:14px}
+.sec-head h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.005em;text-wrap:balance;margin-right:auto}
+.sec-head p{margin:2px 0 0;font-size:13px;color:var(--muted);max-width:70ch}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g-53{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
+.card h3{margin:0 0 2px;font-size:13.5px;font-weight:600}
+.card .sub{font-size:12px;color:var(--muted);margin:0 0 12px}
+.card-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.card-head .sub{margin:0}
+.note{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+.cov{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--fg-2);background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:var(--r);padding:8px 10px;margin-bottom:14px}
+.cov[hidden]{display:none}
+
+/* KPI tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.tile .l{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tile .v{font-family:var(--mono);font-size:21px;font-weight:500;margin-top:6px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .v.bad{color:var(--bad)}
+.tile .alt{font-size:12px;color:var(--muted);margin-top:3px}
+.tile .alt .num{color:var(--fg-2)}
+.delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:500;margin-top:4px}
+.delta.up-good,.delta.down-good{color:var(--good)} .delta.up-bad,.delta.down-bad{color:var(--bad)} .delta.flat{color:var(--muted)}
+.delta .vs{color:var(--muted);font-weight:400}
+
+/* Señales */
+.signals{display:grid;gap:8px;margin-bottom:14px}
+.sig{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);font-size:13px}
+.sig .pill{flex:none;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:3px;margin-top:1px}
+.sig.bad{border-left:3px solid var(--bad)} .sig.bad .pill{background:var(--bad-soft);color:var(--bad)}
+.sig.warn{border-left:3px solid var(--warn)} .sig.warn .pill{background:var(--warn-soft);color:var(--warn)}
+.sig.good{border-left:3px solid var(--good)} .sig.good .pill{background:var(--good-soft);color:var(--good)}
+.sig.info{border-left:3px solid var(--axis)} .sig.info .pill{background:var(--surface-2);color:var(--fg-2)}
+
+/* Tablas */
+.tbl-wrap{overflow-x:auto;margin:0 -2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.n,td.n{text-align:right}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td .pct{display:block;font-size:11px;color:var(--muted)}
+tr.sum td{font-weight:600;background:var(--surface-2)}
+tr.sum td:first-child{border-left:2px solid var(--accent)}
+tr.indent td:first-child{padding-left:20px;color:var(--fg-2)}
+th.sort{cursor:pointer;user-select:none}
+th.sort:hover{color:var(--fg)}
+th.sort[aria-sort="ascending"]::after{content:" ↑"} th.sort[aria-sort="descending"]::after{content:" ↓"}
+tr.hl td{background:var(--accent-soft)}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+.badge{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--muted);margin-left:6px;white-space:nowrap}
+.badge.warn{border-color:var(--warn);color:var(--warn)}
+.code{font-family:var(--mono);font-size:12px;color:var(--muted)}
+input[type=search]{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;font-size:13px;min-width:0;width:220px;max-width:100%}
+
+/* Barras HTML (ranking, composición) */
+.hbars{display:grid;gap:4px}
+.hb{display:grid;grid-template-columns:minmax(90px,190px) minmax(0,1fr) 92px;gap:10px;align-items:center;font-size:12.5px;border-radius:4px;padding:2px 4px}
+.hb.click{cursor:pointer} .hb.click:hover{background:var(--surface-2)}
+.hb .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--fg-2)}
+.hb.hl .lb{color:var(--fg);font-weight:600}
+.hb .tr{position:relative;height:14px}
+.hb .bar{position:absolute;top:0;bottom:0;border-radius:0 4px 4px 0;display:flex;gap:2px}
+.hb .bar.negb{border-radius:4px 0 0 4px}
+.hb .bar i{display:block;height:100%}
+.hb .bar i:last-child{border-radius:0 4px 4px 0}
+.hb .zero{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--axis)}
+.hb .vl{text-align:right;font-family:var(--mono);font-size:12px;color:var(--fg-2)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--fg-2);margin-bottom:8px}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legend .ln{display:inline-block;width:16px;height:0;border-top:2px solid;margin-right:6px;vertical-align:3px}
+.legend .ln.dash{border-top-style:dashed}
+
+/* Gráficos SVG */
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart text{font-family:var(--font);font-size:11px;fill:var(--muted)}
+.chart .tick{font-family:var(--mono);font-size:10.5px}
+.tip{position:fixed;z-index:100;pointer-events:none;background:var(--surface);border:1px solid var(--axis);border-radius:var(--r);padding:8px 10px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.28);max-width:280px;color:var(--fg)}
+.tip[hidden]{display:none}
+.tip .t{font-weight:600;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:14px}
+.tip .r span:last-child{font-family:var(--mono)}
+.strip{display:flex;height:26px;border-radius:4px;overflow:hidden;gap:2px;margin-top:6px}
+.strip div{display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--mono);color:#fff;min-width:0;overflow:hidden;white-space:nowrap}
+.empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
+.empty b{display:block;color:var(--fg);font-size:14px;margin-bottom:4px}
+.cal{display:grid;gap:6px}
+.cal-row{display:grid;grid-template-columns:48px repeat(12,minmax(0,1fr));gap:6px;align-items:stretch}
+.cal-row>span{font-size:12px;color:var(--muted);align-self:center}
+.cal-h{font-size:10.5px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.06em}
+.mcell{border:1px solid var(--line);border-radius:4px;padding:6px 4px;background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;color:var(--fg-2);font-size:11px}
+.mcell.ok{border-color:var(--good)} .mcell.obs{border-color:var(--warn)} .mcell.miss{border-color:var(--bad)} .mcell.none{opacity:.35;cursor:default}
+.mcell[aria-pressed="true"]{background:var(--accent-soft);outline:1px solid var(--accent)}
+.mcell .dots{display:flex;gap:3px}
+.mcell .dots i{width:7px;height:7px;border-radius:2px;background:var(--axis)}
+.mcell .dots i.on{background:var(--fg-2)}
+.st-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--fg-2);margin:10px 0 0}
+.st-legend b{display:inline-block;width:10px;height:10px;border-radius:2px;border:2px solid;margin-right:6px;vertical-align:-1px}
+.obs-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.obs-list li{font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.obs-list li b{font-weight:600}
+.cal{min-width:620px}
+.dropzone{position:fixed;inset:0;z-index:200;background:rgba(10,12,14,.7);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+.dropzone[hidden]{display:none}
+.toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--axis);border-radius:var(--r);padding:10px 14px;font-size:13px;z-index:150;max-width:min(560px,calc(100vw - 32px))}
+.toast[hidden]{display:none}
+/* Franja de avisos: aparece arriba de todo solo cuando hay un problema con los datos */
+.avisos{display:grid;gap:8px;margin:14px 0 18px}
+.avisos[hidden]{display:none}
+.aviso{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--r);border:1px solid var(--line);font-size:13px;line-height:1.45}
+.aviso.bad{border-left:4px solid var(--bad);background:var(--bad-soft)}
+.aviso.warn{border-left:4px solid var(--warn);background:var(--warn-soft)}
+.aviso .pill{flex:none;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:3px;margin-top:1px}
+.aviso.bad .pill{color:var(--bad);border:1px solid var(--bad)} .aviso.warn .pill{color:var(--warn);border:1px solid var(--warn)}
+.aviso .txt{flex:1 1 auto;min-width:0} .aviso .txt ul{margin:4px 0 0;padding-left:18px} .aviso .txt li{margin:2px 0;overflow-wrap:anywhere}
+.aviso .ver{flex:none;font:inherit;font-size:12.5px;background:none;border:1px solid var(--line);color:var(--fg);border-radius:var(--r);padding:3px 9px;cursor:pointer}
+.aviso .ver:hover{border-color:var(--axis)}
+.mcell.nc{border-color:var(--muted);border-style:dashed}
+.aviso .muted{color:var(--muted);font-size:12px}
+.icon-btn.primary{background:var(--s-real);border-color:var(--s-real);color:#fff;font-weight:600}
+.icon-btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.icon-btn[hidden]{display:none!important}
+.dlg{border:1px solid var(--axis);border-radius:var(--r);background:var(--surface);color:var(--fg);padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+.dlg::backdrop{background:rgba(0,0,0,.55)}
+.dlg-in{padding:16px 18px;display:grid;gap:10px}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dlg-head h2{margin:0;font-size:16px}
+.dlg-x{background:none;border:0;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px}
+.dlg input[type=file]{display:none}
+.chk{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.chk li{display:flex;gap:10px;align-items:baseline;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.chk li b{flex:none;width:76px} .chk li .n{overflow-wrap:anywhere;min-width:0}
+.chk li.ok{border-left:3px solid var(--good)} .chk li.no{border-left:3px solid var(--bad);color:var(--fg-2)}
+.dlg-msg{font-size:13px;line-height:1.45;padding:9px 11px;border-radius:var(--r);border:1px solid var(--line)}
+.dlg-msg.bad{border-left:4px solid var(--bad);background:var(--bad-soft)} .dlg-msg.ok{border-left:4px solid var(--good);background:var(--good-soft)}
+.dlg-msg.wait{border-left:4px solid var(--s-real)} .dlg-msg.warn{border-left:4px solid var(--warn);background:var(--warn-soft)} .dlg-msg ul{margin:4px 0 0;padding-left:18px}
+.dlg-pie{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+@media (max-width:640px){ .aviso{flex-wrap:wrap} .aviso .ver{margin-left:auto} }
+
+@media (max-width:980px){ .g2,.g-53{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:640px){
+  .src{display:none}
+  .top-row{flex-wrap:wrap;gap:8px}
+  .brand{flex:1 1 100%} .brand span{display:none}
+  .top-row .icon-btn{flex:1 1 0;padding:6px 6px;text-align:center}
+  .top-row{padding-block:8px}
+  .top-row #btn-filtros{display:inline-block}
+  .icon-btn .long{display:none} .icon-btn .short{display:inline}
+  .top-row .icon-btn{font-size:12.5px;white-space:nowrap}
+  .top:not(.open) .filters,.top:not(.open) .picker{display:none}
+  .scope{padding-block:0 6px;font-size:11.5px}
+  .filters{gap:8px 10px}
+  .f{flex:1 1 140px} .f select{width:100%}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tile .v{font-size:17px}
+  .hb{grid-template-columns:minmax(70px,110px) minmax(0,1fr) 78px;gap:6px}
+  .card{padding:12px}
+}
+@media (prefers-reduced-motion:no-preference){ .hb .bar{transition:width .25s ease,left .25s ease} }
+</style>
+</head>
+<body>
+
+<div id="nojs" style="padding:24px 16px;font:15px/1.5 system-ui,sans-serif;background:#fff3cd;color:#3d2e00;border-bottom:1px solid #e0c36a">
+  <b>Este visor no puede mostrar el tablero.</b><br>
+  Lo estás abriendo en una vista previa (por ejemplo, desde WhatsApp) que no ejecuta los gráficos.
+  Tocá los tres puntos o “Compartir” y elegí <b>Abrir en Chrome</b> (Android) o <b>Abrir en Safari</b> / guardar en Archivos y abrir desde ahí (iPhone).
+</div>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="brand"><b>DAO SRL</b><span>Tablero de gestión · pintura en polvo</span></div>
+      <div class="src" id="src"></div>
+      <input type="file" id="file" accept=".csv,text/csv" multiple hidden>
+      <button class="icon-btn" id="btn-filtros" type="button" aria-expanded="false" aria-controls="filtros">Filtros</button>
+      <button class="icon-btn" id="btn-datos" type="button"><span class="long">Estado de los datos</span><span class="short">Datos</span></button>
+      <button class="icon-btn" id="btn-load" type="button" hidden title="Cargar detalle_clientes_articulos.csv y/o resumen_mensual.csv (uso del equipo)"><span class="long">Cargar datos</span><span class="short">Cargar</span></button>
+      <button class="icon-btn primary" id="btn-subir" type="button" hidden title="Subir los 4 Excel del mes: ER, WEG, COMPRAS y Resumen"><span class="long">Subir Excel del mes</span><span class="short">Subir</span></button>
+      <button class="icon-btn" id="btn-theme" type="button" aria-label="Cambiar tema">Modo claro</button>
+    </div>
+    <div class="filters" id="filtros">
+      <div class="f"><label for="selA">Período</label><select id="selA"></select></div>
+      <div class="f"><label for="selB">Comparar con</label><select id="selB"></select></div>
+      <div class="f"><label for="selCli">Cliente</label><select id="selCli"></select></div>
+      <div class="f"><span class="lab">Costo</span><div class="seg" id="segBasis"><button type="button" data-v="real">Real</button><button type="button" data-v="fx">Teórico</button></div></div>
+      <div class="f"><span class="lab">Montos</span><div class="seg" id="segMode"><button type="button" data-v="avg">Prom. mensual</button><button type="button" data-v="tot">Total período</button></div></div>
+    </div>
+    <div class="picker" id="pickA" hidden></div>
+    <div class="picker" id="pickB" hidden></div>
+    <div class="scope" id="scope"></div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button class="tab" role="tab" data-s="resumen"><small>1</small>Resumen</button>
+      <button class="tab" role="tab" data-s="clientes"><small>2</small>Ranking de clientes</button>
+      <button class="tab" role="tab" data-s="pareto"><small>3</small>Pareto</button>
+      <button class="tab" role="tab" data-s="articulos"><small>4</small>Artículos</button>
+      <button class="tab" role="tab" data-s="m2"><small>5</small>Valores por m²</button>
+      <button class="tab" role="tab" data-s="equilibrio"><small>6</small>Punto de equilibrio</button>
+      <button class="tab" role="tab" data-s="evolucion"><small>7</small>Evolución y comparación</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="avisos" id="avisos" role="status" aria-live="polite" hidden></div>
+  <div class="empty" id="sin-datos" hidden><b>Todavía no hay datos para mostrar</b>Si el tablero está publicado en el servidor, los datos aparecen después de la próxima carga automática.
+    Si lo abriste desde un archivo, pedile al equipo la versión actualizada.</div>
+  <!-- 1 · RESUMEN -->
+  <section id="sec-resumen" data-s="resumen">
+    <div class="sec-head"><div><h2 id="res-title">Resumen ejecutivo</h2><p id="res-sub"></p></div></div>
+    <div class="cov" id="res-cov" hidden></div>
+    <div class="signals" id="res-signals"></div>
+    <div class="tiles" id="res-tiles"></div>
+    <div class="grid g-53">
+      <div class="card">
+        <div class="card-head"><div><h3>Estado de resultados</h3><p class="sub" id="res-er-sub"></p></div></div>
+        <div class="tbl-wrap"><table id="res-er"></table></div>
+        <p class="note" id="res-er-note"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>De ingresos a resultado</h3><p class="sub" id="res-wf-sub"></p></div></div>
+        <div class="chart" id="res-wf"></div>
+        <div id="res-strip-wrap"><p class="sub" style="margin:14px 0 0">De cada $100 vendidos</p><div class="strip" id="res-strip"></div><div class="legend" id="res-strip-lg" style="margin-top:8px"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · CLIENTES -->
+  <section id="sec-clientes" data-s="clientes" hidden>
+    <div class="sec-head"><div><h2>Ranking de clientes</h2><p>Qué cliente deja más por m² pintado. Tocá un cliente para ver sus artículos.</p></div>
+      <div class="f"><span class="lab">Ordenar por</span><div class="seg" id="segRank"><button type="button" data-v="cmgm2">CMg/m²</button><button type="button" data-v="cmg">CMg</button><button type="button" data-v="rb">Res. bruto</button><button type="button" data-v="ing">Ingresos</button></div></div>
+      <div class="f"><label for="selMin">Mínimo m² en el período</label><select id="selMin"><option value="0">Sin mínimo</option><option value="50">50 m²</option><option value="100">100 m²</option><option value="250">250 m²</option><option value="500">500 m²</option></select></div>
+    </div>
+    <div class="cov" id="cli-cov" hidden></div>
+    <div class="grid g-53">
+      <div class="card"><div class="card-head"><div><h3 id="cli-rank-title">Ranking</h3><p class="sub" id="cli-rank-sub"></p></div></div><div class="hbars" id="cli-rank"></div><p class="note" id="cli-rank-note"></p></div>
+      <div class="card"><div class="card-head"><div><h3>Volumen vs rentabilidad</h3><p class="sub">Cada punto es un cliente: m² pintados contra CMg por m². Arriba a la derecha, lo que más conviene.</p></div></div><div class="chart" id="cli-scatter"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-head"><div><h3>Resultado por cliente</h3><p class="sub" id="cli-tbl-sub"></p></div></div>
+      <div class="tbl-wrap"><table id="cli-table"></table></div>
+      <p class="note">El costo fijo se asigna a cada cliente con el costo fijo por pieza del ER (tiempo de línea que ocupa cada artículo). Para meses sin ese dato, se reparte por m² pintados. El costo fijo real se distribuye en la misma proporción.</p>
+    </div>
+  </section>
+
+  <!-- 3 · PARETO -->
+  <section id="sec-pareto" data-s="pareto" hidden>
+    <div class="sec-head"><div><h2>Pareto de clientes</h2><p id="par-sub">Qué clientes concentran el 80% del negocio.</p></div>
+      <div class="f"><span class="lab">Medir por</span><div class="seg" id="segPar"><button type="button" data-v="ing">Ingresos $</button><button type="button" data-v="m2">m² pintados</button></div></div>
+    </div>
+    <div class="cov" id="par-cov" hidden></div>
+    <div class="tiles" id="par-tiles"></div>
+    <div class="card"><div class="legend" id="par-lg"></div><div class="chart" id="par-chart"></div><p class="note">Participación y acumulado sobre el total del período. El promedio mensual divide por todos los meses del período, aunque el cliente no haya comprado en alguno.</p></div>
+    <div class="card" style="margin-top:14px"><h3>Detalle</h3><p class="sub" id="par-tbl-sub"></p><div class="tbl-wrap"><table id="par-table"></table></div></div>
+  </section>
+
+  <!-- 4 · ARTÍCULOS -->
+  <section id="sec-articulos" data-s="articulos" hidden>
+    <div class="sec-head"><div><h2 id="art-title">Detalle de artículos</h2><p id="art-sub"></p></div>
+      <div class="f"><label for="artSearch">Buscar artículo</label><input type="search" id="artSearch" placeholder="Código o descripción"></div>
+    </div>
+    <div class="cov" id="art-cov" hidden></div>
+    <div class="tiles" id="art-tiles"></div>
+    <div class="card"><div class="card-head"><div><h3>Los 12 artículos con más contribución</h3><p class="sub">Cómo se reparte el ingreso de cada artículo entre costo variable y contribución marginal.</p></div></div><div class="legend" id="art-lg"></div><div class="hbars" id="art-stack"></div></div>
+    <div class="card" style="margin-top:14px"><div class="card-head"><div><h3>Todos los artículos</h3><p class="sub" id="art-tbl-sub"></p></div></div><div class="tbl-wrap"><table id="art-table"></table></div><button class="icon-btn" type="button" id="art-more" style="margin-top:10px" hidden></button>
+      <p class="note" id="art-note"></p></div>
+  </section>
+
+  <!-- 5 · VALORES POR M² -->
+  <section id="sec-m2" data-s="m2" hidden>
+    <div class="sec-head"><div><h2>Valores por m²</h2><p>Cuánto se cobra, cuánto cuesta y cuánto queda por cada m² pintado, Real contra Teórico.</p></div></div>
+    <div class="cov" id="m2-cov" hidden></div>
+    <div class="card"><div class="tbl-wrap"><table id="m2-table"></table></div></div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-head"><div><h3 id="m2-chart-title">Evolución</h3><p class="sub" id="m2-chart-sub"></p></div>
+        <div class="seg" id="segM2"><button type="button" data-v="price">Precio</button><button type="button" data-v="cvm2">CV</button><button type="button" data-v="cmgm2">CMg</button><button type="button" data-v="cfm2">CF</button><button type="button" data-v="rbm2">RB</button></div></div>
+      <div class="legend" id="m2-lg"></div><div class="chart" id="m2-chart"></div>
+    </div>
+  </section>
+
+  <!-- 6 · PUNTO DE EQUILIBRIO -->
+  <section id="sec-equilibrio" data-s="equilibrio" hidden>
+    <div class="sec-head"><div><h2>Punto de equilibrio</h2><p>m² que hay que pintar para cubrir los costos fijos (costo fijo ÷ contribución por m²), contra los m² pintados.</p></div></div>
+    <div class="cov" id="eq-cov" hidden></div>
+    <div class="tiles" id="eq-tiles"></div>
+    <div class="card"><div class="card-head"><div><h3>m² pintados vs m² necesarios, por mes</h3><p class="sub" id="eq-sub"></p></div></div><div class="legend" id="eq-lg"></div><div class="chart" id="eq-chart"></div><p class="note" id="eq-note"></p></div>
+  </section>
+
+  <!-- 7 · EVOLUCIÓN Y COMPARACIÓN -->
+  <section id="sec-evolucion" data-s="evolucion" hidden>
+    <div class="sec-head"><div><h2>Evolución y comparación</h2><p>Cualquier período contra cualquier otro. Los montos se comparan en promedio mensual; los valores por m² y los % se recalculan como suma ÷ suma.</p></div></div>
+    <div class="cov" id="evo-cov" hidden></div>
+    <div class="grid g-53">
+      <div class="card"><div class="card-head"><div><h3 id="evo-tbl-title">Período A vs Período B</h3><p class="sub" id="evo-tbl-sub"></p></div></div><div class="tbl-wrap"><table id="evo-table"></table></div></div>
+      <div class="card"><div class="card-head"><div><h3>Mes por mes</h3><p class="sub" id="evo-chart-sub"></p></div>
+        <select id="selEvo" aria-label="Métrica"><option value="ing">Ingresos</option><option value="cmg">Contribución marginal</option><option value="rb">Resultado bruto</option><option value="neto">Resultado neto</option><option value="m2">m² pintados</option><option value="cmgm2">CMg por m²</option><option value="price">Precio por m²</option><option value="mg">Margen CMg %</option></select></div>
+        <div class="legend" id="evo-lg"></div><div class="chart" id="evo-chart"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><div class="card-head"><div><h3>Estacionalidad: mismo mes, distintos años</h3><p class="sub" id="evo-yoy-sub"></p></div></div><div class="legend" id="yoy-lg"></div><div class="chart" id="evo-yoy"></div></div>
+  </section>
+  <!-- ESTADO DE LOS DATOS -->
+  <section id="sec-datos" data-s="datos" hidden>
+    <div class="sec-head"><div><h2>Estado de los datos</h2><p>Qué archivos llegaron de cada mes y qué observaciones dejó el control automático. Tocá un mes para ver el detalle.</p></div></div>
+    <div class="cov" id="dat-como" style="border-left-color:var(--s-real)"></div>
+    <div class="tiles" id="dat-tiles"></div>
+    <div class="card"><div class="card-head"><div><h3>Meses cargados</h3><p class="sub">Cada cuadro es un mes. Los cuatro puntos son ER · WEG · COMPRAS · Resumen (lleno = llegó).</p></div></div>
+      <div class="tbl-wrap"><div class="cal" id="dat-cal"></div></div>
+      <div class="st-legend"><span><b style="border-color:var(--good)"></b>Completo y sin observaciones</span><span><b style="border-color:var(--warn)"></b>Con observaciones</span><span><b style="border-color:var(--bad)"></b>Falta algún archivo</span><span id="leg-nc" hidden><b style="border-color:var(--muted);border-style:dashed"></b>Sin control (no se pudo verificar)</span></div></div>
+    <div class="card" style="margin-top:14px"><div class="card-head"><div><h3 id="dat-mes-title">Detalle del mes</h3><p class="sub" id="dat-mes-sub"></p></div></div>
+      <div id="dat-mes"></div></div>
+  </section>
+
+</main>
+
+<div class="tip" id="tip" hidden></div>
+<div class="dropzone" id="drop" hidden>Soltá los archivos para cargarlos</div>
+<dialog id="dlg-subir" class="dlg" aria-labelledby="dlg-titulo">
+  <form method="dialog" class="dlg-in" id="frm-subir">
+    <div class="dlg-head"><h2 id="dlg-titulo">Subir los Excel del mes</h2><button class="dlg-x" value="cancel" aria-label="Cerrar">✕</button></div>
+    <p class="note">Elegí los <b>4 archivos del mes juntos</b>: ER, WEG, COMPRAS y Resumen (.xls o .xlsx). Un mes se carga solo con los cuatro;
+      para corregir un mes ya cargado, volvé a subir los cuatro y confirmá el reemplazo.</p>
+    <input type="file" id="file-xls" multiple accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <button class="icon-btn" type="button" id="btn-elegir">Elegir archivos…</button>
+    <ul class="chk" id="chk-subir"></ul>
+    <div class="dlg-msg" id="msg-subir" hidden></div>
+    <div class="dlg-pie"><button class="icon-btn" value="cancel" id="btn-cancelar">Cerrar</button><button class="icon-btn primary" type="button" id="btn-enviar" disabled>Cargar</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="text/plain" id="csv-detalle">/*__DETALLE__*/</script>
+<script type="text/plain" id="csv-resumen">/*__RESUMEN__*/</script>
+<script type="application/json" id="json-calidad">/*__CALIDAD__*/</script>
+
+<script>
+'use strict';
+/* ════════════════════════ Utilidades ════════════════════════ */
+const $=s=>document.querySelector(s);
+const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const pY=p=>+p.slice(0,4), pM=p=>+p.slice(5,7);
+const pLabel=p=>`${MES[pM(p)-1]} ${pY(p)}`;
+const pShort=p=>`${MES[pM(p)-1]} ${String(pY(p)).slice(2)}`;
+const addM=(p,k)=>{let t=pY(p)*12+pM(p)-1+k;return `${Math.floor(t/12)}-${String(t%12+1).padStart(2,'0')}`};
+const mIdx=p=>pY(p)*12+pM(p)-1;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isN=v=>v!=null&&isFinite(v);
+const nf=(d)=>new Intl.NumberFormat('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const NF0=nf(0),NF1=nf(1),NF2=nf(2);
+const fM=v=>!isN(v)?'—':(Math.abs(v)>=1e6?`${v<0?'−':''}$${NF2.format(Math.abs(v)/1e6)} M`:Math.abs(v)>=1e3?`${v<0?'−':''}$${NF0.format(Math.abs(v)/1e3)} mil`:`${v<0?'−':''}$${NF0.format(Math.abs(v))}`);
+const fARS=v=>!isN(v)?'—':`${v<0?'−':''}$${NF0.format(Math.abs(v))}`;
+const fN=(v,d=0)=>!isN(v)?'—':(v<0?'−':'')+nf(d).format(Math.abs(v));
+const fM2=v=>!isN(v)?'—':`${fN(v,0)} m²`;
+const fPct=(v,d=1)=>!isN(v)?'—':`${v<0?'−':''}${nf(d).format(Math.abs(v*100))}%`;
+const fAx=v=>{if(!isN(v))return '';const a=Math.abs(v),sg=v<0?'−':'';if(a>=1e6)return `${sg}$${nf(a>=1e7||a%1e6===0?0:1).format(a/1e6)}M`;if(a>=1e3)return `${sg}$${NF0.format(a/1e3)}k`;return `${sg}$${NF0.format(a)}`};
+const fPm2=v=>!isN(v)?'—':`${v<0?'−':''}$${NF0.format(Math.abs(v))}`;
+function rangeLabel(ps){
+  if(!ps.length) return '—';
+  const s=[...ps].sort(); if(s.length===1) return pLabel(s[0]);
+  const contig=s.every((p,i)=>i===0||mIdx(p)===mIdx(s[i-1])+1);
+  if(contig) return `${pShort(s[0])} – ${pShort(s[s.length-1])}`;
+  const runs=[];for(const p of s){const r=runs[runs.length-1]; if(r&&mIdx(p)===mIdx(r[1])+1) r[1]=p; else runs.push([p,p]);}
+  const txt=runs.map(([a,b])=>a===b?pShort(a):`${pShort(a)} – ${pShort(b)}`);
+  return txt.length<=3? txt.join(', ') : `${txt.slice(0,2).join(', ')} y ${s.length-runs.slice(0,2).reduce((n,[a,b])=>n+mIdx(b)-mIdx(a)+1,0)} meses más`;
+}
+function store(k,v){try{ if(v===undefined) return localStorage.getItem('dao.'+k); localStorage.setItem('dao.'+k,v);}catch(e){return null}}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,4200)}
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+
+/* CSV con comillas */
+function parseCSV(text){
+  text=text.replace(/^﻿/,'');
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false;} else cur+=c; }
+    else if(c==='"') q=true; else if(c===','){row.push(cur);cur='';}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur);cur=''; if(row.some(x=>x!=='')) rows.push(row); row=[]; }
+    else cur+=c;}
+  row.push(cur); if(row.some(x=>x!=='')) rows.push(row);
+  if(!rows.length) return [];
+  const h=rows.shift().map(x=>x.trim());
+  return rows.map(r=>Object.fromEntries(h.map((k,i)=>[k,(r[i]??'').trim()])));
+}
+const toNum=v=>{if(v===''||v==null) return null; const n=+String(v).replace(',','.'); return isFinite(n)?n:null};
+
+/* ════════════════════════ Modelo de datos ════════════════════════ */
+const DATA={E:{},D:[],periods:[],hasD:{},Dm2:{},clients:[],source:'',warnings:[]};
+const E_FIELDS=['inversiones','egresos_a_confirmar','m2','ingresos','cv_pintura_fx','cv_quimicos_fx','cv_mod_fx','cf_fx','cv_pintura_real','cv_quimicos_real','cv_mod_real','cf_gastos_real','sueldos','cargas_sociales','retiros_socios','kg_pintura_real','kg_pintura_fx','lts_quimicos','pintura_pagada_real'];
+
+function kindOf(rows){ if(!rows.length) return null; const k=Object.keys(rows[0]);
+  if(k.includes('periodo')&&k.includes('cf_fx')&&k.includes('ingresos')) return 'resumen';
+  if(k.includes('cliente')&&k.includes('articulo')&&k.includes('m2')) return 'detalle'; return null; }
+
+function setDetalle(rows){
+  const noYear=!('anio' in rows[0]);
+  DATA.D=rows.map(r=>{const anio=noYear?2025:toNum(r.anio), mes=toNum(r.mes);
+    return {p:`${anio}-${String(mes).padStart(2,'0')}`,cod:r.cod_cliente||r.cliente,cli:r.cliente,art:r.articulo||'',desc:r.descripcion||'',
+      m2:toNum(r.m2)||0,ing:toNum(r.ingresos)||0,pin:toNum(r.cv_pintura)||0,qui:toNum(r.cv_quimicos)||0,mod:toNum(r.cv_mod)||0,cf:toNum(r.cf_fx),sinRec:r.sin_receta===undefined||r.sin_receta===''?null:toNum(r.sin_receta)===1}}).filter(r=>r.cli&&/^\d{4}-\d{2}$/.test(r.p));
+  if(noYear) DATA.warnings.push('El CSV de detalle no tiene columna "anio": se asumió 2025.');
+}
+function setResumen(rows){ DATA.E={}; rows.forEach(r=>{ if(!/^\d{4}-\d{2}$/.test(r.periodo)) return; const o={}; E_FIELDS.forEach(f=>o[f]=toNum(r[f])??0);
+  o.completo=('completo' in r)?toNum(r.completo)===1:true; DATA.E[r.periodo]=o; }); }
+
+function index(){
+  DATA.hasD={};DATA.Dm2={};const names=new Map();
+  for(const r of DATA.D){DATA.hasD[r.p]=true;DATA.Dm2[r.p]=(DATA.Dm2[r.p]||0)+r.m2;names.set(r.cod,r.cli);}
+  DATA.clients=[...names].map(([cod,cli])=>({cod,cli})).sort((a,b)=>a.cli.localeCompare(b.cli,'es'));
+  const set=new Set([...Object.keys(DATA.E),...Object.keys(DATA.hasD)]);
+  if(!set.size){DATA.periods=[];return}
+  const s=[...set].sort(); DATA.periods=[]; for(let p=s[0];p<=s[s.length-1];p=addM(p,1)) if(set.has(p)) DATA.periods.push(p);
+}
+const hasE=p=>!!DATA.E[p];
+const isNoRec=r=>r.sinRec!=null?r.sinRec:(r.m2>0&&r.pin+r.qui+r.mod===0&&r.cf!=null);
+
+/* Relación Real/Teórico de cada componente en un mes (para estimar el real por cliente y artículo) */
+const RAT={};
+function rat(p){
+  if(p in RAT) return RAT[p]; const e=DATA.E[p]; if(!e||!e.completo) return RAT[p]=null;
+  const cvF=e.cv_pintura_fx+e.cv_quimicos_fx+e.cv_mod_fx, cvR=e.cv_pintura_real+e.cv_quimicos_real+e.cv_mod_real, g=cvF>0?cvR/cvF:1;
+  const cfR=e.cf_gastos_real+e.sueldos+e.cargas_sociales;
+  return RAT[p]={pin:e.cv_pintura_fx>0?e.cv_pintura_real/e.cv_pintura_fx:g,qui:e.cv_quimicos_fx>0?e.cv_quimicos_real/e.cv_quimicos_fx:g,mod:e.cv_mod_fx>0?e.cv_mod_real/e.cv_mod_fx:g,cf:e.cf_fx>0?cfR/e.cf_fx:null};
+}
+function rowCost(r){
+  if(r._c) return r._c; const e=DATA.E[r.p];
+  let cf=r.cf; if(cf==null&&e&&DATA.Dm2[r.p]>0) cf=e.cf_fx*r.m2/DATA.Dm2[r.p];
+  const q=rat(r.p);
+  return r._c={F:{pin:r.pin,qui:r.qui,mod:r.mod,cf},R:q?{pin:r.pin*q.pin,qui:r.qui*q.qui,mod:r.mod*q.mod,cf:(cf!=null&&q.cf!=null)?cf*q.cf:null}:null};
+}
+const blank=()=>({inv:0,conf:0,n:0,months:[],excl:[],m2:0,ing:0,F:{pin:0,qui:0,mod:0,cf:0},R:{pin:0,qui:0,mod:0,cf:0},ret:0,kgR:0,kgF:0,okR:true,okCF:true,company:false,fromD:false});
+
+/* Empresa: usa resumen_mensual; si ningún mes lo tiene, cae al detalle (sin CF ni real) */
+function aggCompany(ps){
+  const o=blank(); const wE=ps.filter(hasE);
+  if(wE.length){ o.company=true; o.months=wE; o.n=wE.length; o.excl=ps.filter(p=>!hasE(p));
+    for(const p of wE){const e=DATA.E[p]; o.m2+=e.m2;o.ing+=e.ingresos;o.F.pin+=e.cv_pintura_fx;o.F.qui+=e.cv_quimicos_fx;o.F.mod+=e.cv_mod_fx;o.F.cf+=e.cf_fx;
+      o.inv+=e.inversiones;o.conf+=e.egresos_a_confirmar; if(!e.completo) o.okR=false;
+      o.R.pin+=e.cv_pintura_real;o.R.qui+=e.cv_quimicos_real;o.R.mod+=e.cv_mod_real;o.R.cf+=e.cf_gastos_real+e.sueldos+e.cargas_sociales;o.ret+=e.retiros_socios;o.kgR+=e.kg_pintura_real;o.kgF+=e.kg_pintura_fx;}
+    return o; }
+  return aggRows(ps,null);
+}
+/* Cliente (o todos desde el detalle) */
+function aggRows(ps,cod){
+  const o=blank(); o.fromD=true; const set=new Set(ps.filter(p=>DATA.hasD[p]));
+  o.months=[...set].sort(); o.n=o.months.length; o.excl=ps.filter(p=>!set.has(p));
+  for(const r of DATA.D){ if(!set.has(r.p)||(cod!=null&&r.cod!==cod)) continue;
+    const c=rowCost(r); o.m2+=r.m2;o.ing+=r.ing;o.F.pin+=c.F.pin;o.F.qui+=c.F.qui;o.F.mod+=c.F.mod;
+    if(c.F.cf==null) o.okCF=false; else o.F.cf+=c.F.cf;
+    if(!c.R) o.okR=false; else {o.R.pin+=c.R.pin;o.R.qui+=c.R.qui;o.R.mod+=c.R.mod; if(c.R.cf==null) o.okCF=false; else o.R.cf+=c.R.cf;} }
+  for(const p of o.months){ if(!hasE(p)) o.okR=false; }
+  return o;
+}
+const aggScope=ps=>ST.client==='all'?aggCompany(ps):aggRows(ps,ST.client);
+
+/* Métricas derivadas. mode 'avg' divide los montos por la cantidad de meses */
+function metrics(o,basis,mode,strict){
+  const fb=basis==='real'&&!o.okR&&!strict; const useC=basis==='real'?(o.okR?o.R:(strict?null:o.F)):o.F;
+  const d=(mode==='avg'&&o.n>0)?o.n:1;
+  const m={n:o.n,m2:o.m2/d,ing:o.ing/d,pin:null,qui:null,mod:null,cv:null,cmg:null,cf:null,rb:null,ret:null,neto:null,kg:null};
+  if(useC){ m.pin=useC.pin/d;m.qui=useC.qui/d;m.mod=useC.mod/d;m.cv=m.pin+m.qui+m.mod;m.cmg=m.ing-m.cv;
+    if(o.okCF) {m.cf=useC.cf/d; m.rb=m.cmg-m.cf;} }
+  if(o.company){ m.ret=o.ret/d; if(m.rb!=null) m.neto=m.rb-m.ret; m.kg=(basis==='real'?o.kgR:o.kgF)/d; m.inv=o.inv/d; m.conf=o.conf/d; }
+  const per=v=>(v!=null&&m.m2>0)?v/m.m2:null;
+  m.price=per(m.ing);m.cvm2=per(m.cv);m.cmgm2=per(m.cmg);m.cfm2=per(m.cf);m.rbm2=per(m.rb);
+  m.mg=(m.cmg!=null&&m.ing)?m.cmg/m.ing:null; m.rbp=(m.rb!=null&&m.ing)?m.rb/m.ing:null; m.netp=(m.neto!=null&&m.ing)?m.neto/m.ing:null;
+  m.pe=(m.cf!=null&&m.cmgm2>0)?m.cf/m.cmgm2:null; m.seg=(m.pe!=null&&m.m2>0)?(m.m2-m.pe)/m.m2:null; m.fallback=fb;
+  return m;
+}
+
+/* ════════════════════════ Estado y períodos ════════════════════════ */
+const ST={A:'last1',Acustom:[],B:'avg12',Bcustom:[],client:'all',basis:'real',mode:'avg',sec:'resumen',rank:'cmgm2',minM2:100,par:'ing',m2m:'cmgm2',evo:'ing',artSort:{c:'cmg',d:-1},cliSort:{c:'cmgm2',d:-1},artQ:''};
+const latest=()=>DATA.periods[DATA.periods.length-1];
+const years=()=>[...new Set(DATA.periods.map(pY))];
+const avail=ps=>ps.filter(p=>DATA.periods.includes(p));
+const span=(a,b)=>{const o=[];for(let p=a;p<=b;p=addM(p,1)) o.push(p);return o};
+function resolveA(){
+  const L=latest(); if(!L) return [];
+  switch(true){
+    case ST.A==='last1': return [L];
+    case ST.A==='last3': return avail(span(addM(L,-2),L));
+    case ST.A==='last12': return avail(span(addM(L,-11),L));
+    case ST.A==='ytd': return avail(span(`${pY(L)}-01`,L));
+    case ST.A.startsWith('y:'): return avail(DATA.periods.filter(p=>pY(p)===+ST.A.slice(2)));
+    case ST.A.startsWith('m:'): return [ST.A.slice(2)];
+    case ST.A==='custom': return ST.Acustom.length?[...ST.Acustom].sort():[L];
+  } return [L];
+}
+function resolveB(A){
+  if(!A.length) return [];
+  const s=[...A].sort(), len=mIdx(s[s.length-1])-mIdx(s[0])+1;
+  switch(ST.B){
+    case 'none': return [];
+    case 'prev': return avail(s.map(p=>addM(p,-len)));
+    case 'yoy': return avail(s.map(p=>addM(p,-12)));
+    case 'avg12': return avail(span(addM(s[s.length-1],-11),s[s.length-1]));
+    case 'custom': return [...ST.Bcustom].sort();
+  } return [];
+}
+const B_LABEL={none:'',prev:'período anterior',yoy:'mismo período año anterior',avg12:'prom. 12 meses',custom:'período B'};
+
+/* ════════════════════════ Gráficos SVG ════════════════════════ */
+const NS='http://www.w3.org/2000/svg';
+function sv(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs) e.setAttribute(k,attrs[k]);if(parent) parent.appendChild(e);return e}
+function niceTicks(min,max,count=5){
+  if(min===max){max=min+1;} const span=max-min, step0=span/count, mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  const step=[1,2,2.5,5,10].map(x=>x*mag).find(x=>span/x<=count)||10*mag;
+  const lo=Math.floor(min/step)*step, hi=Math.ceil(max/step)*step; const t=[];for(let v=lo;v<=hi+step/2;v+=step) t.push(+v.toFixed(10)); return t;
+}
+const TIP=$('#tip');
+function showTip(html,x,y){TIP.innerHTML=html;TIP.hidden=false;const w=TIP.offsetWidth,h=TIP.offsetHeight;let left=x+14,top=y+14;
+  if(left+w>innerWidth-8) left=x-w-14; if(top+h>innerHeight-8) top=y-h-14; TIP.style.left=Math.max(8,left)+'px';TIP.style.top=Math.max(8,top)+'px'}
+function hideTip(){TIP.hidden=true}
+function tipRows(title,rows){return `<div class="t">${esc(title)}</div>`+rows.map(([c,l,v])=>`<div class="r"><span>${c?`<i class="dot" style="background:${c}"></i>`:''}${esc(l)}</span><span>${esc(v)}</span></div>`).join('')}
+function legend(host,items){host.innerHTML=items.map(it=>it.line?`<span><i class="ln ${it.dash?'dash':''}" style="border-color:${it.c}"></i>${esc(it.l)}</span>`:`<span><i class="sw" style="background:${it.c}"></i>${esc(it.l)}</span>`).join('')}
+
+/* Gráfico de categorías: barras agrupadas, barras flotantes y líneas sobre UN eje Y */
+function xyChart(host,cfg){
+  host.innerHTML=''; const W=Math.max(280,host.clientWidth), H=cfg.height||260;
+  const cats=cfg.cats, n=cats.length; if(!n){host.innerHTML='<div class="empty">Sin datos para graficar.</div>';return}
+  let vals=[]; cfg.series.forEach(s=>s.values.forEach(v=>{ if(Array.isArray(v)) vals.push(v[0],v[1]); else if(isN(v)) vals.push(v); }));
+  (cfg.refLines||[]).forEach(r=>vals.push(r.y));
+  let lo=Math.min(0,...vals), hi=Math.max(0,...vals); if(cfg.yMax!=null) hi=cfg.yMax; if(cfg.yMin!=null) lo=cfg.yMin;
+  const ticks=niceTicks(lo,hi,H<220?4:5); lo=ticks[0]; hi=ticks[ticks.length-1];
+  const yf=cfg.yfmt||(v=>fN(v));
+  const ml=Math.max(...ticks.map(t=>yf(t).length))*6.6+12, mr=10, mt=10, mb=26;
+  const pw=W-ml-mr, ph=H-mt-mb, bw=pw/n;
+  const y=v=>mt+ph-(v-lo)/(hi-lo)*ph, x=i=>ml+bw*i+bw/2;
+  const svg=sv('svg',{viewBox:`0 0 ${W} ${H}`,height:H,role:'img','aria-label':cfg.aria||'Gráfico'},host);
+  if(cfg.highlight) cats.forEach((c,i)=>{const h=cfg.highlight(i); if(h) sv('rect',{x:ml+bw*i,y:mt,width:bw,height:ph,fill:h,opacity:1},svg)});
+  ticks.forEach(t=>{sv('line',{x1:ml,x2:W-mr,y1:y(t),y2:y(t),stroke:t===0?css('--axis'):css('--line'),'stroke-width':1},svg);
+    const tx=sv('text',{x:ml-8,y:y(t)+3.5,'text-anchor':'end',class:'tick'},svg);tx.textContent=yf(t)});
+  (cfg.refLines||[]).forEach(r=>{sv('line',{x1:ml,x2:W-mr,y1:y(r.y),y2:y(r.y),stroke:r.c||css('--muted'),'stroke-dasharray':'4 4','stroke-width':1},svg);
+    const t=sv('text',{x:W-mr,y:y(r.y)-5,'text-anchor':'end'},svg);t.textContent=r.label});
+  const step=Math.max(1,Math.ceil(n*(cfg.labelW||42)/pw));
+  cats.forEach((c,i)=>{ if(i%step) return; const t=sv('text',{x:x(i),y:H-8,'text-anchor':'middle'},svg); t.textContent=c; });
+  const bars=cfg.series.filter(s=>s.type!=='line'); const gb=Math.min(bw*0.72,bars.length*34), sb=bars.length?gb/bars.length:0;
+  bars.forEach((s,k)=>s.values.forEach((v,i)=>{ if(v==null) return; let a,b; if(Array.isArray(v)){a=v[0];b=v[1]} else {a=0;b=v} if(!isN(a)||!isN(b)) return;
+    const top=y(Math.max(a,b)), bot=y(Math.min(a,b)), hgt=Math.max(1,bot-top), bx=x(i)-gb/2+sb*k+1, bwid=Math.max(1,sb-2);
+    const col=typeof s.color==='function'?s.color(v,i):s.color; const r=Math.min(4,bwid/2,hgt);
+    const up=(Array.isArray(v)?b>=a:b>=0);
+    const d=up?`M${bx},${bot}V${top+r}Q${bx},${top} ${bx+r},${top}H${bx+bwid-r}Q${bx+bwid},${top} ${bx+bwid},${top+r}V${bot}Z`
+              :`M${bx},${top}V${bot-r}Q${bx},${bot} ${bx+r},${bot}H${bx+bwid-r}Q${bx+bwid},${bot} ${bx+bwid},${bot-r}V${top}Z`;
+    sv('path',{d,fill:col},svg);
+    if(s.labels){const lv=s.labels(v,i); if(lv){const t=sv('text',{x:bx+bwid/2,y:up?top-5:bot+12,'text-anchor':'middle',class:'tick',style:`fill:${css('--fg-2')}`},svg);t.textContent=lv}}
+  }));
+  cfg.series.filter(s=>s.type==='line').forEach(s=>{
+    let d='',pen=false; s.values.forEach((v,i)=>{ if(!isN(v)){pen=false;return} d+=(pen?'L':'M')+x(i)+','+y(v); pen=true; });
+    sv('path',{d,fill:'none',stroke:s.color,'stroke-width':2,'stroke-dasharray':s.dash?'5 4':'none','stroke-linejoin':'round'},svg);
+    s.values.forEach((v,i)=>{ if(!isN(v)) return; const pc=s.pointColor?s.pointColor(v,i):s.color; sv('circle',{cx:x(i),cy:y(v),r:s.r||3.5,fill:pc,stroke:css('--surface'),'stroke-width':2},svg)});
+  });
+  const cross=sv('line',{y1:mt,y2:mt+ph,stroke:css('--axis'),'stroke-width':1,visibility:'hidden'},svg);
+  const hit=sv('rect',{x:ml,y:mt,width:pw,height:ph,fill:'transparent',style:cfg.onClick?'cursor:pointer':''},svg);
+  const idxAt=ev=>{const r=svg.getBoundingClientRect();const px=(ev.clientX-r.left)*W/r.width;return Math.min(n-1,Math.max(0,Math.floor((px-ml)/bw)))};
+  hit.addEventListener('pointermove',ev=>{const i=idxAt(ev);cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
+    showTip(cfg.tip?cfg.tip(i):tipRows(cats[i],cfg.series.map(s=>[typeof s.color==='function'?s.color(s.values[i],i):s.color,s.name,Array.isArray(s.values[i])?yf(s.values[i][1]-s.values[i][0]):yf(s.values[i])])),ev.clientX,ev.clientY)});
+  hit.addEventListener('pointerleave',()=>{cross.setAttribute('visibility','hidden');hideTip()});
+  if(cfg.onClick) hit.addEventListener('click',ev=>cfg.onClick(idxAt(ev)));
+}
+
+/* Dispersión */
+function scatter(host,cfg){
+  host.innerHTML=''; const W=Math.max(280,host.clientWidth),H=cfg.height||300; const pts=cfg.pts; if(!pts.length){host.innerHTML='<div class="empty">Sin clientes para mostrar.</div>';return}
+  const xt=niceTicks(0,Math.max(...pts.map(p=>p.x)),5), yt=niceTicks(Math.min(0,...pts.map(p=>p.y)),Math.max(0,...pts.map(p=>p.y)),5);
+  const ml=Math.max(...yt.map(t=>cfg.yfmt(t).length))*6.6+12,mr=14,mt=12,mb=34,pw=W-ml-mr,ph=H-mt-mb;
+  const x=v=>ml+(v-xt[0])/(xt[xt.length-1]-xt[0])*pw, y=v=>mt+ph-(v-yt[0])/(yt[yt.length-1]-yt[0])*ph;
+  const svg=sv('svg',{viewBox:`0 0 ${W} ${H}`,height:H,role:'img','aria-label':'Dispersión de clientes'},host);
+  yt.forEach(t=>{sv('line',{x1:ml,x2:W-mr,y1:y(t),y2:y(t),stroke:t===0?css('--axis'):css('--line')},svg);const tx=sv('text',{x:ml-8,y:y(t)+3.5,'text-anchor':'end',class:'tick'},svg);tx.textContent=cfg.yfmt(t)});
+  xt.forEach((t,i)=>{ if(i%2&&pw<420) return; const tx=sv('text',{x:x(t),y:mt+ph+16,'text-anchor':'middle',class:'tick'},svg);tx.textContent=cfg.xfmt(t)});
+  const xl=sv('text',{x:ml+pw,y:H-2,'text-anchor':'end'},svg);xl.textContent=cfg.xlabel;
+  const yl=sv('text',{x:ml,y:mt-2,'text-anchor':'start'},svg);yl.textContent='';
+  const sorted=[...pts].sort((a,b)=>(a.hl?1:0)-(b.hl?1:0));
+  sorted.forEach(p=>{const c=sv('circle',{cx:x(p.x),cy:y(p.y),r:p.hl?7:5,fill:p.color,stroke:css('--surface'),'stroke-width':2,style:'cursor:pointer'},svg);
+    c.addEventListener('pointermove',ev=>showTip(cfg.tip(p),ev.clientX,ev.clientY)); c.addEventListener('pointerleave',hideTip); if(cfg.onClick) c.addEventListener('click',()=>cfg.onClick(p));
+  });
+  const placed=[]; [...pts].filter(p=>p.label).sort((a,b)=>(b.hl?1:0)-(a.hl?1:0)||b.x-a.x).forEach(p=>{const lx=x(p.x)+9, ly=y(p.y)+4, w=p.label.length*6.2;
+    const right=lx+w>W-mr; const X=right?x(p.x)-9-w:lx;
+    if(placed.some(q=>Math.abs(q.y-ly)<13&&X<q.x+q.w&&X+w>q.x)) return; placed.push({x:X,y:ly,w});
+    const t=sv('text',{x:X,y:ly,style:`fill:${css('--fg-2')}`},svg);t.textContent=p.label;});
+}
+
+/* Barras horizontales HTML (admite segmentos apilados y negativos) */
+function hbars(host,rows,opt={}){
+  if(!rows.length){host.innerHTML='<div class="empty">Sin datos para el período.</div>';return}
+  const tot=r=>r.segs?r.segs.reduce((s,x)=>s+Math.max(0,x.v),0):r.v;
+  const mx=Math.max(0,...rows.map(tot)), mn=Math.min(0,...rows.map(r=>r.segs?0:r.v)), rng=(mx-mn)||1, z=(-mn)/rng*100;
+  host.innerHTML=rows.map((r,i)=>{
+    let bar; if(r.segs){ const w=tot(r)/rng*100; bar=`<div class="bar" style="left:${z}%;width:${w}%">${r.segs.map(s=>`<i style="flex:${Math.max(0,s.v)} 0 0;background:${s.c}"></i>`).join('')}</div>`; }
+    else { const w=Math.abs(r.v)/rng*100; bar=r.v>=0?`<div class="bar" style="left:${z}%;width:${w}%;background:${r.c}"></div>`:`<div class="bar negb" style="left:${z-w}%;width:${w}%;background:${r.c}"></div>`; }
+    return `<div class="hb ${opt.onClick?'click':''} ${r.hl?'hl':''}" data-i="${i}" ${opt.onClick?'tabindex="0" role="button"':''}><div class="lb" title="${esc(r.label)}">${esc(r.label)}</div><div class="tr">${mn<0?`<span class="zero" style="left:${z}%"></span>`:''}${bar}</div><div class="vl">${esc(r.vl)}</div></div>`}).join('');
+  host.querySelectorAll('.hb').forEach(el=>{const r=rows[+el.dataset.i];
+    if(r.tip){el.addEventListener('pointermove',ev=>showTip(r.tip,ev.clientX,ev.clientY));el.addEventListener('pointerleave',hideTip)}
+    if(opt.onClick){el.addEventListener('click',()=>{hideTip();opt.onClick(r)});el.addEventListener('keydown',ev=>{if(ev.key==='Enter'){opt.onClick(r)}})}});
+}
+
+/* ════════════════════════ Controles ════════════════════════ */
+function fillSelects(){
+  const L=latest(); const yrs=years();
+  const optsA=[['last1',`Último mes (${L?pLabel(L):'—'})`],['last3','Último trimestre'],['last12','Últimos 12 meses'],['ytd',`En lo que va de ${L?pY(L):''}`],...yrs.map(y=>[`y:${y}`,`Año ${y}`])];
+  const months=[...DATA.periods].reverse().map(p=>[`m:${p}`,MESL[pM(p)-1]+' '+pY(p)]);
+  $('#selA').innerHTML=`<optgroup label="Atajos">${optsA.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('')}</optgroup><optgroup label="Un mes">${months.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('')}</optgroup><option value="custom">Elegir meses…</option>`;
+  $('#selB').innerHTML=[['none','Sin comparar'],['avg12','Promedio últimos 12 meses'],['prev','Período anterior'],['yoy','Mismo período del año anterior'],['custom','Elegir meses…']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  $('#selCli').innerHTML=`<option value="all">Todos los clientes</option>`+DATA.clients.map(c=>`<option value="${esc(c.cod)}">${esc(c.cli)}</option>`).join('');
+  if(![...$('#selA').options].some(o=>o.value===ST.A)) ST.A='last1';
+  $('#selA').value=ST.A; $('#selB').value=ST.B; $('#selCli').value=DATA.clients.some(c=>c.cod===ST.client)?ST.client:(ST.client='all');
+  $('#selMin').value=String(ST.minM2); $('#selEvo').value=ST.evo;
+}
+function segSync(){ [['#segBasis','basis'],['#segMode','mode'],['#segRank','rank'],['#segPar','par'],['#segM2','m2m']].forEach(([s,k])=>$(s).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===ST[k])))) }
+function bindSeg(sel,key){ $(sel).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;ST[key]=b.dataset.v;segSync();render()}) }
+
+function buildPicker(which){
+  const host=$(which==='A'?'#pickA':'#pickB'); const key=which==='A'?'Acustom':'Bcustom';
+  if((which==='A'?ST.A:ST.B)!=='custom'){host.hidden=true;return}
+  host.hidden=false; const sel=new Set(ST[key]); const L=latest(); const ly=pY(L);
+  const seasons=[['Verano',[`${ly-1}-12`,`${ly}-01`,`${ly}-02`]],['Otoño',[`${ly}-03`,`${ly}-04`,`${ly}-05`]],['Invierno',[`${ly}-06`,`${ly}-07`,`${ly}-08`]],['Primavera',[`${ly-1}-09`,`${ly-1}-10`,`${ly-1}-11`]]];
+  host.innerHTML=`<div class="picker-head"><b>Período ${which}:</b> ${sel.size?esc(rangeLabel([...sel])):'tocá los meses que querés sumar'}
+    <span style="margin-left:auto">Atajos:</span>${seasons.map(([n,ps])=>`<button class="link" type="button" data-set="${ps.join(',')}">${n} ${ps[ps.length-1].slice(0,4)}</button>`).join('')}<button class="link" type="button" data-set="">Limpiar</button></div>`+
+    years().map(y=>`<div class="yr"><span>${y}</span>${MES.map((m,i)=>{const p=`${y}-${String(i+1).padStart(2,'0')}`;const ok=DATA.periods.includes(p);return `<button type="button" class="mchip" data-p="${p}" aria-pressed="${sel.has(p)}" ${ok?'':'disabled'}>${m}</button>`}).join('')}</div>`).join('');
+  host.onclick=e=>{const b=e.target.closest('button'); if(!b) return;
+    if(b.dataset.p){ sel.has(b.dataset.p)?sel.delete(b.dataset.p):sel.add(b.dataset.p); }
+    else if('set' in b.dataset){ sel.clear(); b.dataset.set.split(',').filter(p=>DATA.periods.includes(p)).forEach(p=>sel.add(p)); }
+    ST[key]=[...sel].sort(); buildPicker(which); render(); };
+}
+
+/* ════════════════════════ Render general ════════════════════════ */
+let A=[],B=[];
+/* Franja de avisos (control de errores): solo aparece cuando algo impide confiar en lo que se ve */
+const DIA_LIMITE=15;   // pasado este día del mes ya debería estar cargado el mes anterior
+function fFecha(iso){ return iso?String(iso).slice(0,10).split('-').reverse().join('/'):'' }
+function mesEsperado(hoy=new Date()){   // último mes que ya debería estar cargado hoy
+  const y=hoy.getFullYear(), m=hoy.getMonth()+1; const atras=hoy.getDate()>DIA_LIMITE?1:2;
+  return addM(`${y}-${String(m).padStart(2,'0')}`,-atras);
+}
+function avisosActuales(){
+  const out=[];
+  const errs=(DATA.Q&&Array.isArray(DATA.Q.errores_carga))?DATA.Q.errores_carga:[];
+  if(errs.length) out.push({c:'bad',p:'Error de carga',t:`No se pudo cargar ${errs.length===1?'un archivo':errs.length+' archivos'}. Los números de ${errs.length===1?'ese mes':'esos meses'} pueden estar incompletos o desactualizados.`,
+    l:errs.map(e=>`<b>${esc(e.archivo||'')}</b>: ${esc(e.error||'')}${e.desde?` <span class="muted">(desde ${fFecha(e.desde)})</span>`:''}`)});
+  const pend=(DATA.Q&&Array.isArray(DATA.Q.pendientes))?DATA.Q.pendientes:[];
+  const lista=(a)=>a.length>1?a.slice(0,-1).join(', ')+' y '+a[a.length-1]:(a[0]||'');
+  pend.forEach(x=>{ const m=pLabel(x.periodo);
+    out.push({c:'warn',p:'Mes pendiente',t:x.ya_cargado
+      ?`Llegaron archivos nuevos de <b>${esc(m)}</b> (${esc(lista(x.llegaron))}), pero para actualizar un mes hay que subir los 4 juntos. Falta${x.faltan.length>1?'n':''} ${esc(lista(x.faltan))}. Mientras tanto se siguen mostrando los datos anteriores.`
+      :`<b>${esc(m)}</b>: llegaron ${x.llegaron.length} de 4 archivos${x.llegaron.length?` (${esc(lista(x.llegaron))})`:''}. Falta${x.faltan.length>1?'n':''} ${esc(lista(x.faltan))}; el mes se carga cuando estén los cuatro.`}); });
+  const enEspera=new Set(pend.map(x=>x.periodo));
+  if(DATA.periods.length){
+    const L=latest(), esp=mesEsperado();
+    if(L<esp){ const falt=[]; for(let p=addM(L,1);p<=esp;p=addM(p,1)) if(!enEspera.has(p)) falt.push(p);
+      if(falt.length)
+      out.push({c:'warn',p:'Datos atrasados',t:`Los datos llegan hasta <b>${esc(pLabel(L))}</b>. Falta${falt.length>1?'n':''} ${esc(falt.length>3?`${pLabel(falt[0])} a ${pLabel(falt[falt.length-1])} (${falt.length} meses)`:falt.map(pLabel).join(', '))}: ${PUBLICADO?'subí los 4 Excel del mes con “Subir Excel del mes”':'pedile al equipo la versión actualizada del tablero'}.`}); }
+  }
+  if(DATA.srvFail) out.push({c:'warn',p:'Sin conexión a los datos',t:`No se pudieron leer los datos del servidor. Se muestran los que trae el archivo${DATA.Q&&DATA.Q.generado?`, procesados el ${fFecha(DATA.Q.generado)}`:''}: pueden no ser los últimos.`});
+  if(DATA.periods.length&&!DATA.Q) out.push({c:'warn',p:'Sin control',t:DATA.source==='Archivos cargados a mano'?'Cargaste CSV a mano: no hay informe de control, así que los números no se verificaron contra los archivos de Luciano.':'No se pudo leer el control de calidad: los números se muestran, pero no se verificaron.'});
+  return out;
+}
+function renderAvisos(){
+  const host=$('#avisos'); const av=avisosActuales(); host.hidden=!av.length;
+  host.innerHTML=av.map(a=>`<div class="aviso ${a.c}"><span class="pill">${a.p}</span><div class="txt">${a.t}${a.l?`<ul>${a.l.map(x=>`<li>${x}</li>`).join('')}</ul>`:''}</div>${ST.sec!=='datos'&&DATA.periods.length?'<button class="ver" type="button" data-go="datos">Ver detalle</button>':''}</div>`).join('');
+}
+/* Filtros guardados en el navegador que ya no corresponden a los meses o clientes cargados */
+function sanearFiltros(){
+  const ps=DATA.periods, ys=years().map(String), cl=DATA.clients.map(c=>c.cod); let cambio=false;
+  const okA=v=>['last1','last3','last12','ytd','custom'].includes(v)||(v.startsWith('m:')&&ps.includes(v.slice(2)))||(v.startsWith('y:')&&ys.includes(v.slice(2)));
+  const fA=ST.Acustom.filter(p=>ps.includes(p)), fB=ST.Bcustom.filter(p=>ps.includes(p));
+  if(fA.length!==ST.Acustom.length){ST.Acustom=fA;cambio=true}
+  if(fB.length!==ST.Bcustom.length){ST.Bcustom=fB;cambio=true}
+  if(typeof ST.A!=='string'||!okA(ST.A)||(ST.A==='custom'&&!ST.Acustom.length)){ST.A='last1';cambio=true}
+  if(!['none','prev','yoy','avg12','custom'].includes(ST.B)||(ST.B==='custom'&&!ST.Bcustom.length)){ST.B='avg12';cambio=true}
+  if(ST.client!=='all'&&!cl.includes(ST.client)){ST.client='all';cambio=true}
+  return cambio;
+}
+function render(){
+  renderAvisos();
+  $('#sin-datos').hidden=!!DATA.periods.length||(PUBLICADO&&!DATA.srvIntentado);   // publicado: no mostrar "sin datos" antes de leer el servidor
+  if(!DATA.periods.length){ document.querySelectorAll('main>section').forEach(s=>s.hidden=true); return; }
+  A=resolveA(); B=resolveB(A);
+  const cliName=ST.client==='all'?'Todos los clientes':(DATA.clients.find(c=>c.cod===ST.client)||{}).cli;
+  $('#scope').innerHTML=`<span><i class="dot" style="background:var(--s-real)"></i>A: <b>${esc(rangeLabel(A))}</b>${A.length>1?` (${A.length} meses)`:''}</span>`+
+    (B.length?`<span><i class="dot" style="background:var(--s-b)"></i>B: <b>${esc(rangeLabel(B))}</b> · ${esc(B_LABEL[ST.B])}</span>`:'')+
+    `<span>${esc(cliName)} · costo ${ST.basis==='real'?'real':'teórico'} · ${ST.mode==='avg'?'promedio mensual':'total del período'}</span>`;
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.s===ST.sec)));
+  document.querySelectorAll('main>section').forEach(s=>s.hidden=s.dataset.s!==ST.sec);
+  $('#btn-datos').setAttribute('aria-pressed',String(ST.sec==='datos'));
+  ({resumen:rResumen,clientes:rClientes,pareto:rPareto,articulos:rArticulos,m2:rM2,equilibrio:rEquilibrio,evolucion:rEvolucion,datos:rDatos})[ST.sec]();
+  try{store('state',JSON.stringify({A:ST.A,Acustom:ST.Acustom,B:ST.B,Bcustom:ST.Bcustom,basis:ST.basis,mode:ST.mode,minM2:ST.minM2}))}catch(e){}
+}
+function coverage(host,parts){ const msgs=parts.filter(Boolean); host.hidden=!msgs.length; host.innerHTML=msgs.length?`<span>${msgs.join('<br>')}</span>`:''; }
+function delta(a,b,goodUp=true,opts={}){
+  if(!isN(a)||!isN(b)||b===0) return '';
+  const pct=opts.abs? (a-b) : (a-b)/Math.abs(b); const up=pct>0, flat=Math.abs(pct)<0.0005;
+  const cls=flat?'flat':up?(goodUp?'up-good':'up-bad'):(goodUp?'down-bad':'down-good');
+  const txt=opts.abs? `${up?'+':'−'}${NF1.format(Math.abs(pct)*100)} pts` : `${up?'+':'−'}${NF1.format(Math.abs(pct)*100)}%`;
+  return `<span class="delta ${cls}"><span aria-hidden="true">${flat?'■':up?'▲':'▼'}</span>${txt} <span class="vs">vs ${esc(B_LABEL[ST.B])}</span></span>`;
+}
+const exclMsg=(ex,what)=>ex.length?`${what} no incluye <b>${esc(rangeLabel(ex))}</b>: no hay ${ST.client==='all'&&what.startsWith('El resumen')?'datos de empresa (resumen mensual)':'detalle por cliente'} para esos meses.`:'';
+function goClient(cod){ ST.client=cod; $('#selCli').value=cod; ST.sec='articulos'; setHash(); render(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+/* ── 1 · Resumen ── */
+function rResumen(){
+  const oA=aggScope(A), oB=B.length?aggScope(B):null;
+  const mA=metrics(oA,ST.basis,ST.mode), mAavg=metrics(oA,ST.basis,'avg'), mBavg=oB?metrics(oB,ST.basis,'avg'):null;
+  const other=ST.basis==='real'?'fx':'real', mO=metrics(oA,other,ST.mode);
+  const isCli=ST.client!=='all';
+  $('#res-title').textContent=isCli?`Resumen · ${(DATA.clients.find(c=>c.cod===ST.client)||{}).cli}`:'Resumen ejecutivo';
+  $('#res-sub').textContent=isCli?'Resultado de este cliente con el costo fijo que le corresponde. Los retiros y el resultado neto son de la empresa y no se reparten.':'Cómo le fue a la empresa en el período, con costo real y teórico lado a lado.';
+  coverage($('#res-cov'),[oA.excl.length?`El resumen no incluye <b>${esc(rangeLabel(oA.excl))}</b>: no hay ${isCli?'detalle por cliente':'datos de empresa'} para esos meses.`:'',
+    oA.fromD&&!isCli?'Para este período solo hay detalle por cliente: no hay costo fijo, costo real ni retiros.':'',
+    ST.basis==='real'&&!oA.okR?'No hay costo real para todos los meses del período (falta el resumen mensual de empresa): las tarjetas y la cascada muestran el costo teórico.':'']);
+  // Señales
+  rSignals(oA,mA,mAavg,mBavg,isCli);
+  // Tiles
+  const per=ST.mode==='avg'&&oA.n>1?' / mes':'';
+  const T=[
+    ['Ingresos',fM(mA.ing),delta(mAavg.ing,mBavg?.ing,true),''],
+    ['Contribución marginal',fM(mA.cmg),delta(mAavg.cmg,mBavg?.cmg,true),`${fPct(mA.mg)} de margen · ${ST.basis==='real'?'teórico':'real'} <span class="num">${fM(mO.cmg)}</span>`,mA.cmg<0],
+    ['Resultado bruto',fM(mA.rb),delta(mAavg.rb,mBavg?.rb,true),`${fPct(mA.rbp)} s/ventas · ${ST.basis==='real'?'teórico':'real'} <span class="num">${fM(mO.rb)}</span>`,mA.rb<0],
+    isCli?['CMg por m²',fPm2(mA.cmgm2),delta(mAavg.cmgm2,mBavg?.cmgm2,true),`Precio ${fPm2(mA.price)} / m²`]:['Resultado neto',fM(mA.neto),delta(mAavg.neto,mBavg?.neto,true),`${fPct(mA.netp)} s/ventas · retiros <span class="num">${fM(mA.ret)}</span>`,mA.neto<0],
+    ['m² pintados',fM2(mA.m2),delta(mAavg.m2,mBavg?.m2,true),isCli?`${fPct(mA.m2/aggCompanyM2(A))} del total de DAO`:(mA.pe!=null?`Equilibrio <span class="num">${fM2(mA.pe)}</span>`:'')]];
+  $('#res-tiles').innerHTML=T.map(([l,v,d,alt,bad])=>`<div class="tile"><div class="l">${l}${per&&l!=='CMg por m²'?`<span style="text-transform:none;letter-spacing:0;font-weight:400">${per}</span>`:''}</div><div class="v ${bad?'bad':''}">${v}</div>${d||''}${alt?`<div class="alt">${alt}</div>`:''}</div>`).join('');
+  // ER Real vs Teórico
+  const R=metrics(oA,'real',ST.mode,true), F=metrics(oA,'fx',ST.mode);
+  const dv=(r,f,goodUp)=>{ if(!isN(r)||!isN(f)||f===0) return '<td class="n">—</td>'; const p=(r-f)/Math.abs(f); const bad=goodUp?p<0:p>0; return `<td class="n ${Math.abs(p)<0.005?'':bad?'neg':'pos'}">${p>0?'+':'−'}${NF1.format(Math.abs(p)*100)}%</td>` };
+  const cell=(v,ing)=>`<td class="n">${fARS(v)}${isN(v)&&ing?`<span class="pct">${fPct(v/ing)}</span>`:''}</td>`;
+  const rows=[['Ingresos por ventas','ing',true,'sum0'],['Costo variable','cv',false,''],['Pintura','pin',false,'indent'],['Químicos','qui',false,'indent'],['Mano de obra directa','mod',false,'indent'],
+    ['Contribución marginal','cmg',true,'sum'],[isCli?'Costo fijo asignado':'Costos fijos','cf',false,''],['Resultado bruto','rb',true,'sum']];
+  if(!isCli) rows.push(['Retiros de socios','ret',false,''],['Resultado neto','neto',true,'sum']);
+  $('#res-er').innerHTML=`<thead><tr><th>Concepto</th><th class="n">Real</th><th class="n">Teórico</th><th class="n" title="Real contra teórico">Desvío</th></tr></thead><tbody>`+
+    rows.map(([l,k,g,cls])=>`<tr class="${cls==='sum0'?'':cls}"><td>${l}</td>${cell(R[k],R.ing)}${cell(F[k],F.ing)}${k==='ing'||k==='ret'?'<td class="n"></td>':dv(R[k],F[k],g)}</tr>`).join('')+
+    (!isCli&&(F.inv>0||F.conf>0)?`<tr><td colspan="4" style="padding-top:14px;font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Fuera del resultado</td></tr>`+
+      (F.inv>0?`<tr class="indent"><td>Inversiones en equipos</td><td class="n">${fARS(F.inv)}</td><td class="n">${fARS(F.inv)}</td><td class="n"></td></tr>`:'')+
+      (F.conf>0?`<tr class="indent"><td>Egresos a confirmar (INDELPLAST)</td><td class="n">${fARS(F.conf)}</td><td class="n">${fARS(F.conf)}</td><td class="n"></td></tr>`:''):'')+'</tbody>';
+  $('#res-er-sub').textContent=`${rangeLabel(oA.months.length?oA.months:A)} · ${ST.mode==='avg'&&oA.n>1?'promedio mensual':'total'} · % sobre ventas debajo de cada monto`;
+  $('#res-er-note').innerHTML=isCli?'El costo real por cliente se estima: el costo real de cada componente del mes se reparte en la misma proporción que el costo teórico. El costo fijo usa el costo fijo por pieza del ER.':'Real (®): pintura según compras WEG, químicos y gastos según COMPRAS, sueldos, cargas y mano de obra. Teórico (Fx): receta de costo del ER. Desvío en verde cuando favorece al resultado.';
+  // Cascada
+  const m=mA; const steps=[['Ingresos',m.ing,'t'],['Costo var.',-m.cv,'d'],['Contrib.',m.cmg,'t'],['C. fijos',-(m.cf??NaN),'d'],['Res. bruto',m.rb,'t']];
+  if(!isCli) steps.push(['Retiros',-(m.ret??NaN),'d'],['Res. neto',m.neto,'t']);
+  let run=0; const vals=steps.map(([l,v,t])=>{ if(!isN(v)) return null; if(t==='t'){run=v;return [0,v]} const a=run; run+=v; return [run,a] });
+  $('#res-wf-sub').textContent=`Costo ${ST.basis==='real'?'real':'teórico'} · ${ST.mode==='avg'&&oA.n>1?'promedio mensual':'total del período'}`;
+  xyChart($('#res-wf'),{cats:steps.map(s=>s[0]),height:250,yfmt:fAx,labelW:56,
+    series:[{name:'Monto',type:'bar',values:vals,color:(v,i)=>steps[i][2]==='t'?(steps[i][1]<0?css('--bad'):css('--s-real')):css('--s-fx'),labels:(v,i)=>v&&$('#res-wf').clientWidth>=480?fAx(steps[i][1]):''}],
+    tip:i=>tipRows(steps[i][0],[[null,'Monto',fARS(steps[i][1])],[null,'% s/ventas',fPct(steps[i][1]/m.ing)]])});
+  // Franja de $100
+  const parts=[['Costo variable',m.cv,'--c1'],['Costos fijos',m.cf,'--c2'],...(isCli?[]:[['Retiros',m.ret,'--s-fx']]),[isCli?'Resultado bruto':'Resultado neto',isCli?m.rb:m.neto,'--c3']];
+  const okStrip=parts.every(p=>isN(p[1])&&p[1]>=0)&&m.ing>0;
+  $('#res-strip-wrap').hidden=!okStrip;
+  if(okStrip){ $('#res-strip').innerHTML=parts.map(([l,v,c])=>`<div style="flex:${v} 0 0;background:var(${c})" title="${l}: $${NF0.format(v/m.ing*100)}">${v/m.ing>=.07?'$'+NF0.format(v/m.ing*100):''}</div>`).join('');
+    legend($('#res-strip-lg'),parts.map(([l,v,c])=>({l:`${l} $${NF0.format(v/m.ing*100)}`,c:css(c)}))); }
+}
+function aggCompanyM2(ps){ const o=aggRows(ps,null); return o.m2||1 }
+function rSignals(oA,mA,mAavg,mBavg,isCli){
+  const S=[]; const lab=B_LABEL[ST.B];
+  if(mBavg&&isN(mAavg.rb)&&isN(mBavg.rb)&&mBavg.rb>0){ const d=(mAavg.rb-mBavg.rb)/mBavg.rb; if(d<=-0.25) S.push(['bad','Resultado',`El resultado bruto ${ST.basis==='real'?'real':'teórico'} está ${NF0.format(-d*100)}% por debajo del ${lab} (${fM(mAavg.rb)} contra ${fM(mBavg.rb)} por mes).`]); else if(d>=0.15) S.push(['good','Resultado',`El resultado bruto está ${NF0.format(d*100)}% por encima del ${lab}.`]); }
+  if(!isCli&&isN(mA.pe)&&isN(mA.m2)){ if(mA.m2<mA.pe) S.push(['bad','Equilibrio',`Se pintaron ${fM2(mA.m2)} y hacían falta ${fM2(mA.pe)} para cubrir los costos fijos.`]); else if(mA.seg<0.15) S.push(['warn','Equilibrio',`Margen de seguridad de ${fPct(mA.seg)}: se pintó apenas por encima del punto de equilibrio.`]); }
+  const R=metrics(oA,'real','tot',true),F=metrics(oA,'fx','tot');
+  if(isN(R.cv)&&isN(F.cv)&&F.cv>0){ const d=(R.cv-F.cv)/F.cv; if(d>0.25) S.push(['warn','Costos',`El costo variable real supera al teórico en ${NF0.format(d*100)}%. Componente con más desvío: ${['pin','qui','mod'].map(k=>[k,F[k]>0?(R[k]-F[k])/F[k]:0]).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({pin:'pintura',qui:'químicos',mod:'mano de obra'})[k]+` (+${NF0.format(v*100)}%)`)[0]}.`]); }
+  if(!isCli){ const cl=clientTable(A).filter(c=>isN(c.m.cmg)&&c.m.cmg<0); if(cl.length) S.push(['warn','Clientes',`${cl.length===1?'Un cliente dejó':cl.length+' clientes dejaron'} contribución negativa: ${cl.slice(0,4).map(c=>c.cli).join(', ')}${cl.length>4?'…':''}.`]); }
+  if(!isCli&&mA.inv>0) S.push(['info','Inversión',`En el período se invirtieron ${fM(mA.inv)}${ST.mode==='avg'&&oA.n>1?' por mes':''} en equipos. No se restan del resultado: se muestran aparte, debajo del estado de resultados.`]);
+  const nr=DATA.D.filter(r=>A.includes(r.p)&&isNoRec(r)&&(isCli?r.cod===ST.client:true));
+  if(nr.length){ const m2=nr.reduce((s,r)=>s+r.m2,0); S.push(['info','Datos',`${nr.length} artículo${nr.length>1?'s':''} sin receta de costo en el ER (${fM2(m2)}). Su costo teórico figura en $0 e infla el margen teórico.`]); }
+  const dq=dataChecks(A); dq.forEach(m=>S.push(['info','Datos',m]));
+  $('#res-signals').innerHTML=S.map(([c,p,t])=>`<div class="sig ${c}"><span class="pill">${p}</span><span>${t}</span></div>`).join('');
+}
+function dataChecks(ps){
+  if(DATA.Q&&DATA.Q.meses){ const out=[]; ps.forEach(p=>{const q=DATA.Q.meses[p]; if(!q) return;
+      const nd=q.diferencias.filter(d=>!d.explicada).length;
+      (q.avisos||[]).forEach(n=>out.push(`${pLabel(p)}: ${esc(n)}`));
+      if(nd) out.push(`${pLabel(p)}: ${nd} diferencia${nd>1?'s':''} entre los archivos del mes y el Resumen. <button class="link" type="button" data-go="datos">Ver estado de los datos</button>`);
+      if(q.faltantes.length) out.push(`${pLabel(p)}: falta ${esc(q.faltantes.join(', '))}.`); });
+    return out.slice(0,5); }
+  const out=[]; const s=[...DATA.periods].filter(hasE);
+  for(let i=1;i<s.length;i++){ const a=DATA.E[s[i-1]],b=DATA.E[s[i]]; if(!ps.includes(s[i])&&!ps.includes(s[i-1])) continue;
+    if(a.cv_quimicos_real>0&&Math.abs(a.cv_quimicos_real-b.cv_quimicos_real)<1) out.push(`Químicos reales idénticos en ${pLabel(s[i-1])} y ${pLabel(s[i])} (${fARS(b.cv_quimicos_real)}). Posible copia: revisar la compra a WHOR.`);
+    if(a.retiros_socios>0&&Math.abs(a.retiros_socios-b.retiros_socios)<1) out.push(`Retiros idénticos en ${pLabel(s[i-1])} y ${pLabel(s[i])}.`); }
+  return out;
+}
+
+/* ── 2 · Clientes ── */
+function clientTable(ps){
+  const set=new Set(ps.filter(p=>DATA.hasD[p])); const by=new Map();
+  for(const r of DATA.D){ if(!set.has(r.p)) continue; if(!by.has(r.cod)) by.set(r.cod,[]); by.get(r.cod).push(r); }
+  const n=set.size; const out=[];
+  for(const [cod,rows] of by){ const o=blank(); o.fromD=true; o.n=n; o.months=[...set];
+    for(const r of rows){const c=rowCost(r);o.m2+=r.m2;o.ing+=r.ing;o.F.pin+=c.F.pin;o.F.qui+=c.F.qui;o.F.mod+=c.F.mod;if(c.F.cf==null)o.okCF=false;else o.F.cf+=c.F.cf;
+      if(!c.R)o.okR=false;else{o.R.pin+=c.R.pin;o.R.qui+=c.R.qui;o.R.mod+=c.R.mod;if(c.R.cf==null)o.okCF=false;else o.R.cf+=c.R.cf;}}
+    for(const p of set) if(!hasE(p)) o.okR=false;
+    out.push({cod,cli:rows[0].cli,o,m:metrics(o,ST.basis,ST.mode)}); }
+  return out;
+}
+function rClientes(){
+  const all=clientTable(A); const nD=A.filter(p=>DATA.hasD[p]);
+  coverage($('#cli-cov'),[nD.length<A.length?`El detalle por cliente no incluye <b>${esc(rangeLabel(A.filter(p=>!DATA.hasD[p])))}</b>. Se muestran ${nD.length} de ${A.length} meses.`:'',
+    ST.basis==='real'&&all.some(c=>!c.o.okR)?'No hay costo real para todos los meses del período: el ranking usa el costo teórico.':'']);
+  const tot=metrics(aggRows(A,null),ST.basis,'tot').m2; const minM=ST.minM2;
+  const rk=ST.rank; const key={cmgm2:'cmgm2',cmg:'cmg',rb:'rb',ing:'ing'}[rk]; const fmt={cmgm2:fPm2,cmg:fM,rb:fM,ing:fM}[rk];
+  const sumM2=c=>c.o.m2;
+  const elig=all.filter(c=>sumM2(c)>=minM&&isN(c.m[key])), hidden=all.length-all.filter(c=>sumM2(c)>=minM).length;
+  elig.sort((a,b)=>b.m[key]-a.m[key]);
+  $('#cli-rank-title').textContent=`Ranking por ${({cmgm2:'contribución por m²',cmg:'contribución marginal',rb:'resultado bruto',ing:'ingresos'})[rk]}`;
+  $('#cli-rank-sub').textContent=`${rangeLabel(nD)} · costo ${ST.basis==='real'?'real':'teórico'}${rk!=='cmgm2'?(ST.mode==='avg'?' · promedio mensual':' · total'):''}`;
+  hbars($('#cli-rank'),elig.map(c=>({label:c.cli,v:c.m[key],vl:fmt(c.m[key]),hl:c.cod===ST.client,cod:c.cod,
+    c:c.cod===ST.client?css('--warn'):(c.m[key]<0?css('--bad'):css('--s-real')),
+    tip:tipRows(c.cli,[[null,'CMg/m²',fPm2(c.m.cmgm2)],[null,'Contribución',fM(c.m.cmg)],[null,'Resultado bruto',fM(c.m.rb)],[null,'Ingresos',fM(c.m.ing)],[null,'m²',fM2(c.m.m2)],[null,'Margen',fPct(c.m.mg)]])})),{onClick:r=>goClient(r.cod)});
+  $('#cli-rank-note').textContent=hidden?`${hidden} cliente${hidden>1?'s':''} con menos de ${minM} m² en el período no entra${hidden>1?'n':''} al ranking (con tan poca superficie el valor por m² no es representativo).`:'';
+  // Dispersión
+  const pts=all.filter(c=>isN(c.m.cmgm2)&&c.o.m2>0).map(c=>({x:c.o.m2,y:c.m.cmgm2,c,hl:c.cod===ST.client,color:c.cod===ST.client?css('--warn'):(c.m.cmgm2<0?css('--bad'):css('--s-real'))}));
+  const top=[...pts].sort((a,b)=>b.x-a.x).slice(0,4); pts.forEach(p=>{ if(top.includes(p)||p.hl||p.y<0) p.label=p.c.cli.length>16?p.c.cli.slice(0,15)+'…':p.c.cli });
+  scatter($('#cli-scatter'),{pts,height:300,xfmt:v=>fN(v),yfmt:v=>fPm2(v),xlabel:'m² pintados en el período →',
+    tip:p=>tipRows(p.c.cli,[[null,'m²',fM2(p.c.o.m2)],[null,'CMg/m²',fPm2(p.c.m.cmgm2)],[null,'Contribución',fM(metrics(p.c.o,ST.basis,'tot').cmg)]]),onClick:p=>goClient(p.c.cod)});
+  // Tabla
+  const cols=[['cli','Cliente',0],['m2','m²',1],['share','% m²',1],['ing','Ingresos',1],['cv','Costo var.',1],['cmg','Contribución',1],['mg','Margen',1],['cmgm2','CMg/m²',1],['cf','C. fijo asign.',1],['rb','Res. bruto',1],['rbm2','RB/m²',1]];
+  const totM2=aggRows(A,null).m2; all.forEach(c=>c.m.share=totM2?c.o.m2/totM2:null);
+  const s=ST.cliSort; const val=(c,k)=>k==='cli'?c.cli:c.m[k]; all.sort((a,b)=>{const x=val(a,s.c),y=val(b,s.c); if(typeof x==='string') return s.d*x.localeCompare(y,'es'); return s.d*((isN(x)?x:-1e18)-(isN(y)?y:-1e18))});
+  const fm={m2:fM2,share:fPct,ing:fM,cv:fM,cmg:fM,mg:fPct,cmgm2:fPm2,cf:fM,rb:fM,rbm2:fPm2};
+  $('#cli-tbl-sub').textContent=`${all.length} clientes · ${rangeLabel(nD)} · ${ST.mode==='avg'?'montos en promedio mensual':'montos totales del período'} · costo ${ST.basis==='real'?'real (estimado por cliente)':'teórico'}`;
+  $('#cli-table').innerHTML=`<thead><tr>${cols.map(([k,l,n])=>`<th class="sort ${n?'n':''}" data-k="${k}" aria-sort="${s.c===k?(s.d>0?'ascending':'descending'):'none'}">${l}</th>`).join('')}</tr></thead><tbody>`+
+    all.map(c=>`<tr class="click ${c.cod===ST.client?'hl':''}" data-cod="${esc(c.cod)}">${cols.map(([k])=>k==='cli'?`<td>${esc(c.cli)}${c.o.m2<minM?'<span class="badge">poco volumen</span>':''}</td>`:`<td class="n ${['cmg','rb','cmgm2','rbm2','mg'].includes(k)&&c.m[k]<0?'neg':''}">${fm[k](c.m[k])}</td>`).join('')}</tr>`).join('')+'</tbody>';
+  $('#cli-table').querySelectorAll('th.sort').forEach(th=>th.onclick=()=>{const k=th.dataset.k; ST.cliSort=s.c===k?{c:k,d:-s.d}:{c:k,d:k==='cli'?1:-1}; rClientes()});
+  $('#cli-table').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>goClient(tr.dataset.cod));
+}
+
+/* ── 3 · Pareto ── */
+function rPareto(){
+  const by=ST.par; const nD=A.filter(p=>DATA.hasD[p]); const all=clientTable(A).map(c=>({...c,val:by==='ing'?c.o.ing:c.o.m2})).filter(c=>c.val>0).sort((a,b)=>b.val-a.val);
+  coverage($('#par-cov'),[nD.length<A.length?`El Pareto usa el detalle por cliente, disponible en ${nD.length} de ${A.length} meses del período (falta ${esc(rangeLabel(A.filter(p=>!DATA.hasD[p])))}).`:'']);
+  const total=all.reduce((s,c)=>s+c.val,0); let cum=0; all.forEach(c=>{c.share=c.val/total;cum+=c.share;c.cum=cum});
+  const k80=all.findIndex(c=>c.cum>=0.8)+1; const top=all[0];
+  const unit=by==='ing'?'de los ingresos':'de los m² pintados';
+  $('#par-sub').textContent=all.length?`${k80} de ${all.length} clientes concentran el ${fPct(all[k80-1]?.cum??0,0)} ${unit}. ${top.cli} solo aporta el ${fPct(top.share,0)}.`:'Sin datos.';
+  const nm=nD.length||1;
+  $('#par-tiles').innerHTML=[['Clientes en el 80%',`${k80} de ${all.length}`],['Mayor cliente',esc(top?.cli||'—'),`${fPct(top?.share)} ${unit}`],
+    [by==='ing'?'Ingresos promedio por mes':'m² promedio por mes',by==='ing'?fM(total/nm):fM2(total/nm),`${nm} mes${nm>1?'es':''} con detalle`],['Resto de los clientes',fPct(1-(all[k80-1]?.cum??0)),`${all.length-k80} clientes`]]
+    .map(([l,v,a])=>`<div class="tile"><div class="l">${l}</div><div class="v" style="font-size:${v.length>14?'15px':''}">${v}</div>${a?`<div class="alt">${a}</div>`:''}</div>`).join('');
+  const cA=css('--s-real'),cB=css('--s-fx'),cL=css('--fg-2');
+  legend($('#par-lg'),[{l:'Dentro del 80%',c:cA},{l:'Resto',c:cB},{l:'% acumulado',c:cL,line:1}]);
+  const lim=Math.min(all.length,innerWidth<640?12:25); const shown=all.slice(0,lim);
+  xyChart($('#par-chart'),{cats:shown.map(c=>c.cli.length>10?c.cli.slice(0,9)+'…':c.cli),height:300,yMax:100,yfmt:v=>NF0.format(v)+'%',labelW:62,refLines:[{y:80,label:'80%'}],
+    series:[{name:'Participación',type:'bar',values:shown.map(c=>c.share*100),color:(v,i)=>i<k80?cA:cB},{name:'% acumulado',type:'line',values:shown.map(c=>c.cum*100),color:cL}],
+    tip:i=>tipRows(shown[i].cli,[[null,by==='ing'?'Ingresos':'m²',by==='ing'?fM(shown[i].val):fM2(shown[i].val)],[null,'Participación',fPct(shown[i].share)],[null,'Acumulado',fPct(shown[i].cum)]]),
+    onClick:i=>goClient(shown[i].cod)});
+  $('#par-tbl-sub').textContent=`${rangeLabel(nD)} · promedio mensual = total ÷ ${nm} mes${nm>1?'es':''}`;
+  $('#par-table').innerHTML=`<thead><tr><th>#</th><th>Cliente</th><th class="n">${by==='ing'?'Ingresos':'m²'} total</th><th class="n">Prom. mensual</th><th class="n">Participación</th><th class="n">Acumulado</th><th class="n">CMg/m²</th></tr></thead><tbody>`+
+    all.map((c,i)=>`<tr class="click ${i<k80?'':''} ${c.cod===ST.client?'hl':''}" data-cod="${esc(c.cod)}"><td class="code">${i+1}</td><td>${esc(c.cli)}${i<k80?'<span class="badge">80%</span>':''}</td><td class="n">${by==='ing'?fARS(c.val):fM2(c.val)}</td><td class="n">${by==='ing'?fM(c.val/nm):fM2(c.val/nm)}</td><td class="n">${fPct(c.share)}</td><td class="n">${fPct(c.cum)}</td><td class="n ${c.m.cmgm2<0?'neg':''}">${fPm2(c.m.cmgm2)}</td></tr>`).join('')+'</tbody>';
+  $('#par-table').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>goClient(tr.dataset.cod));
+}
+
+/* ── 4 · Artículos ── */
+function rArticulos(){
+  const isCli=ST.client!=='all'; const name=isCli?(DATA.clients.find(c=>c.cod===ST.client)||{}).cli:'';
+  $('#art-title').textContent=isCli?`Artículos · ${name}`:'Artículos · todos los clientes';
+  $('#art-sub').textContent=isCli?'Qué artículos de este cliente dejan más contribución.':'Elegí un cliente arriba (o tocá uno en el ranking) para ver solo sus artículos.';
+  const nD=A.filter(p=>DATA.hasD[p]); const set=new Set(nD);
+  coverage($('#art-cov'),[nD.length<A.length?`El detalle por artículo no incluye <b>${esc(rangeLabel(A.filter(p=>!DATA.hasD[p])))}</b>.`:'',
+    ST.basis==='real'&&nD.some(p=>!hasE(p))?'Sin costo real para algunos meses: se muestra el costo teórico en esos meses.':'']);
+  const map=new Map(); const q=ST.artQ.toLowerCase();
+  for(const r of DATA.D){ if(!set.has(r.p)||(isCli&&r.cod!==ST.client)) continue; const k=r.art+'|'+(isCli?'':r.cod);
+    if(!map.has(k)) map.set(k,{art:r.art,desc:r.desc,cli:r.cli,cod:r.cod,m2:0,ing:0,pin:0,qui:0,mod:0,cf:0,cfOk:true,noRec:false,est:false});
+    const a=map.get(k), c=rowCost(r), C=(ST.basis==='real'&&c.R)?c.R:c.F; if(ST.basis==='real'&&c.R) a.est=true;
+    a.m2+=r.m2;a.ing+=r.ing;a.pin+=C.pin;a.qui+=C.qui;a.mod+=C.mod; if(C.cf==null) a.cfOk=false; else a.cf+=C.cf; if(isNoRec(r)) a.noRec=true; }
+  const d=ST.mode==='avg'&&nD.length?nD.length:1;
+  let arts=[...map.values()].map(a=>{const cv=a.pin+a.qui+a.mod;return {...a,cv,cmg:a.ing-cv,rb:a.cfOk?a.ing-cv-a.cf:null,cmgm2:a.m2?(a.ing-cv)/a.m2:null,mg:a.ing?(a.ing-cv)/a.ing:null}});
+  const tot=arts.reduce((s,a)=>({m2:s.m2+a.m2,ing:s.ing+a.ing,cmg:s.cmg+a.cmg}),{m2:0,ing:0,cmg:0});
+  const star=[...arts].filter(a=>!a.noRec).sort((a,b)=>b.cmg-a.cmg)[0]; const nNoRec=arts.filter(a=>a.noRec).length; const negs=arts.filter(a=>a.cmg<0).length;
+  $('#art-tiles').innerHTML=[['Artículos pintados',fN(arts.length),`${fM2(tot.m2/d)}${d>1?' por mes':''}`],['Contribución',fM(tot.cmg/d),`margen ${fPct(tot.ing?tot.cmg/tot.ing:null)}`],
+    ['Artículo estrella',star?esc(star.desc):'—',star?`<span class="code">${esc(star.art)}</span> · ${fM(star.cmg/d)}`:''],['Con contribución negativa',fN(negs),negs?'revisar precio o receta':'ninguno']]
+    .map(([l,v,a])=>`<div class="tile"><div class="l">${l}</div><div class="v" style="${String(v).length>16?'font-size:14px;white-space:normal;line-height:1.25':''}">${v}</div>${a?`<div class="alt">${a}</div>`:''}</div>`).join('');
+  // Apilado top 12
+  const cP=css('--c1'),cQ=css('--c2'),cM=css('--c3'),cC=css('--s-fx');
+  legend($('#art-lg'),[{l:'Pintura',c:cP},{l:'Químicos',c:cQ},{l:'Mano de obra',c:cM},{l:'Contribución marginal',c:cC}]);
+  const top=[...arts].filter(a=>a.ing>0&&!a.noRec).sort((a,b)=>b.cmg-a.cmg).slice(0,12);
+  hbars($('#art-stack'),top.map(a=>({label:a.desc||a.art,vl:fM(a.cmg/d),segs:[{v:a.pin,c:cP},{v:a.qui,c:cQ},{v:a.mod,c:cM},{v:Math.max(0,a.cmg),c:cC}],
+    tip:tipRows(`${a.art} · ${a.desc}`,[[cP,'Pintura',fM(a.pin/d)],[cQ,'Químicos',fM(a.qui/d)],[cM,'Mano de obra',fM(a.mod/d)],[cC,'Contribución',fM(a.cmg/d)],[null,'Ingreso',fM(a.ing/d)],[null,'m²',fM2(a.m2/d)]])})));
+  // Tabla
+  if(q) arts=arts.filter(a=>(a.art+' '+a.desc+' '+a.cli).toLowerCase().includes(q));
+  const s=ST.artSort; const v=(a,k)=>a[k]; arts.sort((a,b)=>{const x=v(a,s.c),y=v(b,s.c); if(typeof x==='string') return s.d*x.localeCompare(y,'es'); return s.d*((isN(x)?x:-1e18)-(isN(y)?y:-1e18))});
+  const cols=[['art','Artículo',0],['desc','Descripción',0],...(isCli?[]:[['cli','Cliente',0]]),['m2','m²',1],['ing','Ingreso',1],['pin','Pintura',1],['qui','Químicos',1],['mod','MOD',1],['cmg','Contribución',1],['mg','Margen',1],['cmgm2','CMg/m²',1],['cf','C. fijo',1],['rb','Res. bruto',1]];
+  const fm={m2:x=>fN(x/d,1),ing:x=>fARS(x/d),pin:x=>fARS(x/d),qui:x=>fARS(x/d),mod:x=>fARS(x/d),cmg:x=>fARS(x/d),mg:fPct,cmgm2:fPm2,cf:x=>a_cf(x),rb:x=>isN(x)?fARS(x/d):'—'};
+  function a_cf(x){return isN(x)?fARS(x/d):'—'}
+  $('#art-tbl-sub').textContent=`${arts.length} artículos · ${rangeLabel(nD)} · ${d>1?'promedio mensual':'total'}`;
+  const lim=ST.artAll?arts.length:60;
+  $('#art-table').innerHTML=`<thead><tr>${cols.map(([k,l,n])=>`<th class="sort ${n?'n':''}" data-k="${k}" aria-sort="${s.c===k?(s.d>0?'ascending':'descending'):'none'}">${l}</th>`).join('')}</tr></thead><tbody>`+
+    arts.slice(0,lim).map(a=>`<tr>${cols.map(([k])=>k==='art'?`<td class="code">${esc(a.art||'—')}</td>`:k==='desc'?`<td style="min-width:200px">${esc(a.desc)}${a.noRec?'<span class="badge warn" title="El ER no trae receta de costo para este artículo">sin receta</span>':''}</td>`:k==='cli'?`<td>${esc(a.cli)}</td>`:`<td class="n ${['cmg','mg','cmgm2','rb'].includes(k)&&a[k]<0?'neg':''}">${k==='cf'&&!a.cfOk?'—':fm[k](a[k])}</td>`).join('')}</tr>`).join('')+'</tbody>';
+  $('#art-more').hidden=arts.length<=60; $('#art-more').textContent=ST.artAll?'Mostrar menos':`Mostrar los ${arts.length} artículos`;
+  $('#art-table').querySelectorAll('th.sort').forEach(th=>th.onclick=()=>{const k=th.dataset.k; ST.artSort=s.c===k?{c:k,d:-s.d}:{c:k,d:['art','desc','cli'].includes(k)?1:-1}; rArticulos()});
+  $('#art-note').innerHTML=(nNoRec?`${nNoRec} artículo${nNoRec>1?'s':''} sin receta de costo en el ER quedan fuera del gráfico y del artículo estrella (figuran con costo $0). `:'')+'El ER factura por cliente, no por artículo: el ingreso de cada artículo es el del cliente repartido según sus m². Desde 2026 el costo teórico sale de la receta de cada artículo en el ER (pintura, químicos, mano de obra y costo fijo por pieza). En los datos 2025 el costo también está repartido por m², por eso todos los artículos de un mismo cliente y mes muestran el mismo CMg/m².'+(ST.basis==='real'?' Con costo real, cada componente se ajusta por la relación real/teórico del mes.':'');
+}
+
+/* ── Serie mensual para gráficos ── */
+function windowMonths(){ const s=[...A].sort(); if(s.length>=3) return span(s[0],s[s.length-1]).filter(p=>DATA.periods.includes(p)); const L=s[s.length-1]; return span(addM(L,-12),L).filter(p=>DATA.periods.includes(p)); }
+const monthly=(ps,basis)=>ps.map(p=>metrics(aggScope([p]),basis,'tot'));
+
+/* ── 5 · Valores por m² ── */
+function rM2(){
+  const o=aggScope(A); const R=metrics(o,'real',ST.mode,true),F=metrics(o,'fx',ST.mode); const oB=B.length?aggScope(B):null; const Bm=oB?metrics(oB,ST.basis,ST.mode):null;
+  coverage($('#m2-cov'),[o.excl.length?`No incluye <b>${esc(rangeLabel(o.excl))}</b> (sin datos).`:'',ST.client!=='all'?'Valores de este cliente: el costo real y el costo fijo son asignados.':'']);
+  const rows=[['Precio (ingreso)','price',true],['Costo variable','cvm2',false],['Contribución marginal','cmgm2',true],['Costo fijo','cfm2',false],['Resultado bruto','rbm2',true]];
+  const dv=(r,f,g)=>{ if(!isN(r)||!isN(f)||f===0) return '—'; const p=(r-f)/Math.abs(f); const bad=g?p<0:p>0; return `<span class="${Math.abs(p)<.005?'':bad?'neg':'pos'}">${p>0?'+':'−'}${NF1.format(Math.abs(p)*100)}%</span>`};
+  $('#m2-table').innerHTML=`<thead><tr><th>Por m² pintado</th><th class="n">Real</th><th class="n">Teórico</th><th class="n">Desvío</th>${Bm?`<th class="n">${ST.basis==='real'?'Real':'Teórico'} B</th><th class="n">A vs B</th>`:''}</tr></thead><tbody>`+
+    rows.map(([l,k,g])=>`<tr class="${k==='cmgm2'||k==='rbm2'?'sum':''}"><td>${l}</td><td class="n">${fPm2(R[k])}</td><td class="n">${fPm2(F[k])}</td><td class="n">${k==='price'?'':dv(R[k],F[k],g)}</td>${Bm?`<td class="n">${fPm2(Bm[k])}</td><td class="n">${dv((ST.basis==='real'?R:F)[k],Bm[k],g)}</td>`:''}</tr>`).join('')+
+    `<tr><td>m² pintados</td><td class="n" colspan="2" style="text-align:center">${fM2(R.m2)}</td><td></td>${Bm?`<td class="n">${fM2(Bm.m2)}</td><td></td>`:''}</tr>`+
+    (o.company?`<tr><td>Pintura: kg y m² por kg</td><td class="n">${fN(R.kg)} kg<span class="pct">${fN(R.m2/R.kg,2)} m²/kg</span></td><td class="n">${fN(F.kg)} kg<span class="pct">${fN(F.m2/F.kg,2)} m²/kg</span></td><td class="n">${dv(R.kg,F.kg,false)}</td>${Bm?'<td></td><td></td>':''}</tr>`:'')+'</tbody>';
+  const W=windowMonths(); const k=ST.m2m; const names={price:'Precio por m²',cvm2:'Costo variable por m²',cmgm2:'Contribución por m²',cfm2:'Costo fijo por m²',rbm2:'Resultado bruto por m²'};
+  $('#m2-chart-title').textContent=names[k]; $('#m2-chart-sub').textContent=`${rangeLabel(W)} · meses del período A resaltados`;
+  const r=W.map(p=>metrics(aggScope([p]),'real','tot',true)[k]), f=monthly(W,'fx').map(m=>m[k]);
+  const series=k==='price'?[{name:'Precio por m²',type:'line',values:r,color:css('--s-real')}]:[{name:'Real',type:'line',values:r,color:css('--s-real')},{name:'Teórico',type:'line',values:f,color:css('--s-fx'),dash:1}];
+  legend($('#m2-lg'),series.map(s=>({l:s.name,c:s.color,line:1,dash:s.dash})));
+  const hl=css('--accent-soft');
+  xyChart($('#m2-chart'),{cats:W.map(pShort),height:270,yfmt:v=>fPm2(v),series,highlight:i=>A.includes(W[i])?hl:null,labelW:44,
+    tip:i=>tipRows(MESL[pM(W[i])-1]+' '+pY(W[i]),series.map(s=>[s.color,s.name,fPm2(s.values[i])]).concat(series.length>1&&isN(r[i])&&isN(f[i])&&f[i]?[[null,'Desvío',fPct((r[i]-f[i])/Math.abs(f[i]))]]:[]))});
+}
+
+/* ── 6 · Punto de equilibrio ── */
+function rEquilibrio(){
+  const sv=ST.client; ST.client='all'; // el equilibrio es de la empresa
+  try{
+  const o=aggScope(A); const R=metrics(o,'real',ST.mode),F=metrics(o,'fx',ST.mode); const oB=B.length?aggScope(B):null; const Ra=metrics(o,'real','avg'),Rb=oB?metrics(oB,'real','avg'):null;
+  coverage($('#eq-cov'),[sv!=='all'?'El punto de equilibrio es de la empresa: el filtro de cliente no se aplica en esta sección.':'',o.excl.length?`No incluye <b>${esc(rangeLabel(o.excl))}</b> (sin datos de empresa).`:'',o.fromD?'Sin datos de costo fijo para este período.':'']);
+  const per=ST.mode==='avg'&&o.n>1?' / mes':'';
+  $('#eq-tiles').innerHTML=[['Equilibrio real'+per,fM2(R.pe),delta(Ra.pe,Rb?.pe,false),`CF ${fM(R.cf)} ÷ ${fPm2(R.cmgm2)}/m²`],['Equilibrio teórico'+per,fM2(F.pe),'',`CF ${fM(F.cf)} ÷ ${fPm2(F.cmgm2)}/m²`],
+    ['m² pintados'+per,fM2(R.m2),delta(Ra.m2,Rb?.m2,true),''],['Margen de seguridad',fPct(R.seg),'',isN(R.seg)?(R.seg<0?'<span class="neg">por debajo del equilibrio</span>':`${fM2(R.m2-R.pe)} por encima`):'',R.seg<0]]
+    .map(([l,v,d,a,bad])=>`<div class="tile"><div class="l">${l}</div><div class="v ${bad?'bad':''}">${v}</div>${d||''}${a?`<div class="alt">${a}</div>`:''}</div>`).join('');
+  const W=windowMonths().filter(hasE); const mr=monthly(W,'real'), mf=monthly(W,'fx');
+  const cBar=css('--s-b'),cR=css('--s-real'),cF=css('--s-fx');
+  legend($('#eq-lg'),[{l:'m² pintados',c:cBar},{l:'Necesarios (real)',c:cR,line:1},{l:'Necesarios (teórico)',c:cF,line:1,dash:1}]);
+  $('#eq-sub').textContent=`${rangeLabel(W)} · meses del período A resaltados`;
+  const hl=css('--accent-soft');
+  xyChart($('#eq-chart'),{cats:W.map(pShort),height:290,yfmt:v=>fN(v),labelW:44,highlight:i=>A.includes(W[i])?hl:null,
+    series:[{name:'m² pintados',type:'bar',values:mr.map(m=>m.m2),color:(v,i)=>isN(mr[i].pe)&&mr[i].m2<mr[i].pe?css('--bad'):cBar},{name:'Necesarios (real)',type:'line',values:mr.map(m=>m.pe),color:cR},{name:'Necesarios (teórico)',type:'line',values:mf.map(m=>m.pe),color:cF,dash:1}],
+    tip:i=>tipRows(MESL[pM(W[i])-1]+' '+pY(W[i]),[[cBar,'m² pintados',fM2(mr[i].m2)],[cR,'Necesarios (real)',fM2(mr[i].pe)],[cF,'Necesarios (teórico)',fM2(mf[i].pe)],[null,'Margen de seguridad',fPct(mr[i].seg)]])});
+  const below=W.filter((p,i)=>isN(mr[i].pe)&&mr[i].m2<mr[i].pe);
+  $('#eq-note').innerHTML=below.length?`Meses por debajo del equilibrio real (barra en rojo): <b>${below.map(pLabel).join(', ')}</b>. En esos meses lo pintado no alcanzó para cubrir los costos fijos.`:'En todos los meses graficados se pintó por encima del equilibrio real.';
+  } finally { ST.client=sv; }
+}
+
+/* ── 7 · Evolución y comparación ── */
+function rEvolucion(){
+  const oA=aggScope(A), oB=B.length?aggScope(B):null; const a=metrics(oA,ST.basis,'avg'), b=oB?metrics(oB,ST.basis,'avg'):null;
+  const same=B.length&&A.length===B.length&&A.every((p,i)=>p===[...B].sort()[i]);
+  coverage($('#evo-cov'),[!B.length?'Elegí un período en “Comparar con” para ver A contra B.':'',same?'El período B es igual al A. Elegí otra opción en “Comparar con” (por ejemplo, “Mismo período del año anterior”).':'',oA.excl.length?`A no incluye ${esc(rangeLabel(oA.excl))} (sin datos).`:'',oB&&oB.excl.length?`B no incluye ${esc(rangeLabel(oB.excl))} (sin datos).`:'']);
+  $('#evo-tbl-title').textContent=B.length?`${rangeLabel(A)} vs ${rangeLabel(B)}`:rangeLabel(A);
+  $('#evo-tbl-sub').textContent=`Montos en promedio mensual (A: ${oA.n} mes${oA.n!==1?'es':''}${oB?`, B: ${oB.n} mes${oB.n!==1?'es':''}`:''}) · costo ${ST.basis==='real'?'real':'teórico'}`;
+  const isCli=ST.client!=='all';
+  const rows=[['Ingresos','ing',true,fM],['m² pintados','m2',true,fM2],['Costo variable','cv',false,fM],['Contribución marginal','cmg',true,fM],['Costos fijos','cf',false,fM],['Resultado bruto','rb',true,fM],
+    ...(isCli?[]:[['Retiros de socios','ret',false,fM],['Resultado neto','neto',true,fM],['Inversiones en equipos','inv',false,fM]]),['Precio por m²','price',true,fPm2],['CV por m²','cvm2',false,fPm2],['CMg por m²','cmgm2',true,fPm2],['RB por m²','rbm2',true,fPm2],
+    ['Margen CMg','mg',true,fPct,1],['Resultado bruto s/ventas','rbp',true,fPct,1],...(isCli?[]:[['Punto de equilibrio','pe',false,fM2]])];
+  $('#evo-table').innerHTML=`<thead><tr><th>Concepto</th><th class="n">A</th>${b?'<th class="n">B</th><th class="n">Variación</th>':''}</tr></thead><tbody>`+
+    rows.map(([l,k,g,f,pts])=>{ let v=''; if(b&&isN(a[k])&&isN(b[k])){ const dd=pts?(a[k]-b[k]):(b[k]?(a[k]-b[k])/Math.abs(b[k]):null); if(isN(dd)){ const bad=g?dd<0:dd>0; v=Math.abs(dd)<.0005?'<span>= 0,0'+(pts?' pts':'%')+'</span>':`<span class="${bad?'neg':'pos'}">${dd>0?'▲ +':'▼ −'}${NF1.format(Math.abs(dd)*100)}${pts?' pts':'%'}</span>`; } }
+      return `<tr class="${['cmg','rb','neto'].includes(k)?'sum':''}"><td>${l}</td><td class="n">${f(a[k])}</td>${b?`<td class="n">${f(b[k])}</td><td class="n">${v||'—'}</td>`:''}</tr>`}).join('')+'</tbody>';
+  // Mes por mes
+  const k=ST.evo; const all=DATA.periods; const ms=monthly(all,ST.basis); const fmt=['m2'].includes(k)?fM2:['cmgm2','price'].includes(k)?fPm2:k==='mg'?fPct:fM;
+  const cA=css('--s-real'),cB=css('--s-b'),cO=css('--axis');
+  legend($('#evo-lg'),[{l:'Período A',c:cA},...(B.length?[{l:'Período B',c:cB}]:[]),{l:'Otros meses',c:cO}]);
+  $('#evo-chart-sub').textContent=`${rangeLabel(all)} · costo ${ST.basis==='real'?'real':'teórico'}`;
+  const vals=ms.map(m=>m[k]);
+  xyChart($('#evo-chart'),{cats:all.map(pShort),height:270,yfmt:k==='mg'?(v=>NF0.format(v*100)+'%'):(fmt===fM?fAx:v=>fN(v)),labelW:46,
+    series:[{name:$('#selEvo').selectedOptions[0].text,type:'bar',values:vals,color:(v,i)=>A.includes(all[i])?cA:B.includes(all[i])?cB:cO}],
+    tip:i=>tipRows(MESL[pM(all[i])-1]+' '+pY(all[i]),[[null,$('#selEvo').selectedOptions[0].text,fmt(vals[i])],...(A.includes(all[i])?[[cA,'En período A','']]:[]),...(B.includes(all[i])?[[cB,'En período B','']]:[])]),
+    onClick:i=>{ST.A='m:'+all[i];$('#selA').value=ST.A;buildPicker('A');render()}});
+  // Interanual
+  const yrs=years().slice(-3); const pal=[css('--c2'),css('--s-fx'),css('--s-real')];
+  const series=yrs.map((y,j)=>({name:String(y),type:'line',dash:j<yrs.length-1&&j===0&&yrs.length===3,values:MES.map((m,i)=>{const p=`${y}-${String(i+1).padStart(2,'0')}`;const idx=all.indexOf(p);return idx>=0?vals[idx]:null}),color:pal[j+3-yrs.length]}));
+  legend($('#yoy-lg'),series.map(s=>({l:s.name,c:s.color,line:1,dash:s.dash})));
+  $('#evo-yoy-sub').textContent=`${$('#selEvo').selectedOptions[0].text} · una línea por año${years().length>3?' (últimos 3 años)':''}`;
+  xyChart($('#evo-yoy'),{cats:MES.map(m=>m[0].toUpperCase()+m.slice(1)),height:250,yfmt:k==='mg'?(v=>NF0.format(v*100)+'%'):(fmt===fM?fAx:v=>fN(v)),series,labelW:30,
+    tip:i=>tipRows(MESL[i],series.map(s=>[s.color,s.name,fmt(s.values[i])]))});
+}
+
+/* ── Estado de los datos ── */
+let datSel=null;
+function monthStatus(p){
+  const q=DATA.Q&&DATA.Q.meses?DATA.Q.meses[p]:null;
+  // Sin informe de control no se sabe si llegaron WEG y COMPRAS ni si concilian: el mes queda "sin control", nunca en verde
+  if(!q) return {q,src:{ER:!!DATA.hasD[p],WEG:null,COMPRAS:null,RESUMEN:hasE(p)},cls:'nc'};
+  const src={ER:!!DATA.hasD[p],WEG:false,COMPRAS:false,RESUMEN:hasE(p)};
+  q.fuentes.forEach(f=>src[f]=true);
+  const est=q.estado?q.estado:(!(src.ER&&src.RESUMEN)?'faltan_archivos':'ok');
+  return {q,src,cls:est==='faltan_archivos'?'miss':est==='revisar'?'obs':'ok'};
+}
+function rDatos(){
+  $('#dat-como').innerHTML=PUBLICADO
+    ?'<span><b>Cómo se cargan los meses:</b> con “Subir Excel del mes” (los 4 archivos juntos: ER, WEG, COMPRAS y Resumen); el servidor los procesa en el momento. Un mes se carga recién cuando están los cuatro.</span>'
+    :'<span><b>Esta es una copia guardada del tablero.</b> Muestra los datos del día en que se generó. Para ver meses nuevos, abrí el tablero publicado en el servidor o pedile al equipo la versión actualizada.</span>';
+  const ps=DATA.periods; const L=latest(); if(!datSel||!ps.includes(datSel)) datSel=L;
+  const st=ps.map(monthStatus); const comp=st.filter(s=>s.cls==='ok').length, obs=st.filter(s=>s.cls==='obs').length, miss=st.filter(s=>s.cls==='miss').length;
+  const nc=st.filter(s=>s.cls==='nc').length;
+  $('#leg-nc').hidden=!nc;
+  $('#dat-tiles').innerHTML=[['Meses cargados',fN(ps.length),rangeLabel(ps)],['Último mes',pLabel(L),DATA.Q&&DATA.Q.generado?`procesado ${DATA.Q.generado.slice(0,10).split('-').reverse().join('/')}`:'sin informe de control'],
+    nc===ps.length?['Sin observaciones','—','sin informe de control: no se verificó']:['Sin observaciones',fN(comp),'completos y conciliados'+(nc?` · ${nc} sin control`:'')],
+    nc===ps.length?['Para revisar','—','sin informe de control']:['Para revisar',fN(obs+miss),`${obs} con observaciones · ${miss} con archivos faltantes`]]
+    .map(([l,v,a])=>`<div class="tile"><div class="l">${l}</div><div class="v">${v}</div>${a?`<div class="alt">${esc(a)}</div>`:''}</div>`).join('');
+  const ys=years();
+  $('#dat-cal').innerHTML=`<div class="cal-row"><span></span>${MES.map((m,i)=>`<div class="cal-h ${i>=6?'h2':''}">${m}</div>`).join('')}</div>`+
+    ys.map(y=>`<div class="cal-row"><span>${y}</span>${MES.map((m,i)=>{const p=`${y}-${String(i+1).padStart(2,'0')}`; if(!ps.includes(p)) return `<div class="mcell none" aria-hidden="true">—</div>`;
+      const s=monthStatus(p); return `<button type="button" class="mcell ${s.cls}" data-p="${p}" aria-pressed="${p===datSel}" title="${pLabel(p)}">${m}<span class="dots">${['ER','WEG','COMPRAS','RESUMEN'].map(k=>`<i class="${s.src[k]?'on':''}" title="${k}"></i>`).join('')}</span></button>`}).join('')}</div>`).join('');
+  $('#dat-cal').querySelectorAll('button.mcell').forEach(b=>b.onclick=()=>{datSel=b.dataset.p;rDatos()});
+  const s=monthStatus(datSel), q=s.q;
+  $('#dat-mes-title').textContent=`${MESL[pM(datSel)-1]} ${pY(datSel)}`;
+  $('#dat-mes-sub').textContent=`Archivos: ${['ER','WEG','COMPRAS','RESUMEN'].map(k=>`${k==='RESUMEN'?'Resumen':k} ${s.src[k]===null?'sin dato':s.src[k]?'✓':'falta'}`).join(' · ')}`;
+  if(!q){ $('#dat-mes').innerHTML=`<p class="note"><b>Sin informe de control para este mes.</b> Los números se muestran, pero no se verificó que hayan llegado todos los archivos ni que coincidan con el Resumen.${DATA.source==='Archivos cargados a mano'?' (Se cargaron CSV a mano.)':' Puede que el archivo calidad.json falte o esté dañado: avisale al equipo.'}</p>`; return; }
+  const items=[...q.faltantes.map(f=>`<li><b>Falta:</b> ${esc(f)}</li>`),...(q.avisos||[]).map(n=>`<li><b>Revisar:</b> ${esc(n)}</li>`),...q.notas.map(n=>`<li>${esc(n)}</li>`),...(q.sin_receta||[]).length?[`<li><b>Artículos sin receta de costo en el ER:</b> <span class="code">${esc(q.sin_receta.join(', '))}</span></li>`]:[]];
+  const dif=q.diferencias.length?`<h3 style="margin:14px 0 6px">Archivos del mes contra el Resumen</h3><div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th class="n">Archivo del mes</th><th class="n">Resumen</th><th class="n">Diferencia</th></tr></thead><tbody>${q.diferencias.map(d=>`<tr><td>${esc(d.concepto)}${d.explicada?'<span class="badge">explicada</span>':'<span class="badge warn">revisar</span>'}</td><td class="n">${fN(d.archivo_mensual)}</td><td class="n">${fN(d.resumen)}</td><td class="n ${d.dif<0?'neg':''}">${fN(d.dif)}</td></tr>`).join('')}</tbody></table></div><p class="note">El tablero usa el valor del Resumen (es el número oficial de Luciano). Los archivos mensuales sirven de control.</p>`:'';
+  $('#dat-mes').innerHTML=(items.length?`<ul class="obs-list">${items.join('')}</ul>`:'<p class="note">Todo en orden: llegaron los cuatro archivos y coinciden con el Resumen.</p>')+dif;
+}
+
+/* ════════════════════════ Carga de datos ════════════════════════ */
+function srcLabel(){ const ps=DATA.periods; const e=Object.keys(DATA.E).sort(); const d=Object.keys(DATA.hasD).sort();
+  $('#src').innerHTML=`<b>${esc(DATA.source)}</b><br>Empresa: ${e.length?esc(rangeLabel(e)):'—'} · Detalle: ${d.length?esc(rangeLabel(d)):'—'}${DATA.Q&&DATA.Q.generado?` · procesado ${esc(DATA.Q.generado.slice(0,10).split('-').reverse().join('/'))}`:''}`; }
+function boot(det,res,source){
+  if(det){const rows=parseCSV(det); if(kindOf(rows)==='detalle') setDetalle(rows);}
+  if(res){const rows=parseCSV(res); if(kindOf(rows)==='resumen') setResumen(rows);}
+  for(const k in RAT) delete RAT[k]; DATA.D.forEach(r=>delete r._c);
+  DATA.source=source; index();
+  const saneado=DATA.periods.length?sanearFiltros():false;
+  fillSelects(); segSync(); srcLabel(); buildPicker('A'); buildPicker('B'); render();
+  if(saneado&&DATA.estadoGuardado) toast('Se restablecieron los filtros porque cambiaron los meses o clientes disponibles.');
+}
+async function handleFiles(files){
+  let det=null,res=null,unknown=[];
+  for(const f of files){ const t=await f.text(); const k=kindOf(parseCSV(t)); if(k==='detalle') det=t; else if(k==='resumen') res=t; else unknown.push(f.name); }
+  if(!det&&!res){ toast(`No reconozco ${unknown.join(', ')||'el archivo'}: tiene que ser el CSV de detalle (cliente, articulo, m2…) o el resumen mensual (periodo, ingresos, cf_fx…).`); return; }
+  DATA.warnings=[]; DATA.Q=null; boot(det,res,'Archivos cargados a mano');
+  toast(`Cargado: ${[det&&'detalle por artículo',res&&'resumen mensual'].filter(Boolean).join(' y ')}.${DATA.warnings.length?' '+DATA.warnings.join(' '):''}`);
+}
+
+/* ════════════════════════ Eventos ════════════════════════ */
+function setHash(){ try{ history.replaceState(null,'','#'+ST.sec) }catch(e){} }
+$('#tabs').addEventListener('click',e=>{const t=e.target.closest('.tab'); if(!t) return; ST.sec=t.dataset.s; setHash(); render();});
+$('#selA').addEventListener('change',e=>{ST.A=e.target.value; buildPicker('A'); render()});
+$('#selB').addEventListener('change',e=>{ST.B=e.target.value; buildPicker('B'); render()});
+$('#selCli').addEventListener('change',e=>{ST.client=e.target.value; render()});
+$('#selMin').addEventListener('change',e=>{ST.minM2=+e.target.value; render()});
+$('#selEvo').addEventListener('change',e=>{ST.evo=e.target.value; render()});
+$('#art-more').addEventListener('click',()=>{ST.artAll=!ST.artAll;rArticulos()});
+$('#artSearch').addEventListener('input',e=>{ST.artQ=e.target.value; rArticulos()});
+bindSeg('#segBasis','basis');bindSeg('#segMode','mode');bindSeg('#segRank','rank');bindSeg('#segPar','par');bindSeg('#segM2','m2m');
+$('#btn-load').onclick=()=>$('#file').click();
+$('#btn-filtros').onclick=()=>{const t=$('.top');const o=!t.classList.contains('open');t.classList.toggle('open',o);$('#btn-filtros').setAttribute('aria-expanded',String(o));};
+$('#btn-datos').onclick=()=>{ST.sec=ST.sec==='datos'?'resumen':'datos';setHash();render();};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]'); if(b){ST.sec=b.dataset.go;setHash();render();window.scrollTo({top:0});}});
+$('#file').addEventListener('change',e=>{ if(e.target.files.length) handleFiles([...e.target.files]); e.target.value=''; });
+addEventListener('dragover',e=>{e.preventDefault();$('#drop').hidden=false});
+addEventListener('dragleave',e=>{ if(e.target===$('#drop')||!e.relatedTarget) $('#drop').hidden=true });
+addEventListener('drop',e=>{e.preventDefault();$('#drop').hidden=true; const fs=[...e.dataTransfer.files]; if(!fs.length) return;
+  if(fs.some(f=>/\.xlsx?$/i.test(f.name))){ if(PUBLICADO) abrirSubida(fs); else toast('Para cargar Excel abrí el tablero publicado en el servidor y usá “Subir Excel del mes”.'); return; }
+  handleFiles(fs)});
+
+/* ════════════════════════ Subir los Excel del mes (solo publicado) ════════════════════════ */
+const PUBLICADO=/^https?:$/.test(location.protocol);
+const TIPOS=['ER','WEG','COMPRAS','RESUMEN'], TNOM={ER:'ER',WEG:'WEG',COMPRAS:'COMPRAS',RESUMEN:'Resumen'};
+const MAX_MB=20;
+let SUBIR={files:[],periodo:null,ok:false,enviando:false,confirmar:false};
+function idArchivo(n){   // mismo criterio que identificar() del pipeline
+  if(n.startsWith('~$')||!/\.xlsx?$/i.test(n)) return null;
+  const m=n.match(/^(ER|WEG|COMPRAS)[\s_\-]*(\d{1,2})[\s_\-]+(\d{4})/i);
+  if(m&&+m[2]>=1&&+m[2]<=12) return {tipo:m[1].toUpperCase(),periodo:`${m[3]}-${String(+m[2]).padStart(2,'0')}`};
+  if(/resumen/i.test(n)) return {tipo:'RESUMEN',periodo:null};
+  return null;
+}
+function mesLargo(p){ return p?`${MESL[pM(p)-1].toLowerCase()} ${pY(p)}`:'' }
+function validarSubida(files){
+  const prob=[], porTipo={};
+  if(files.length!==4) prob.push(`Elegiste ${files.length} archivo${files.length===1?'':'s'}: hay que subir los 4 del mes juntos.`);
+  const mb=files.reduce((a,f)=>a+f.size,0)/1048576; if(mb>MAX_MB) prob.push(`Los archivos pesan ${NF1.format(mb)} MB; el máximo es ${MAX_MB} MB.`);
+  files.forEach(f=>{ const i=idArchivo(f.name);
+    if(!/\.xlsx?$/i.test(f.name)){ prob.push(`${f.name}: no es un Excel (.xls o .xlsx).`); return; }
+    if(!i){ prob.push(`${f.name}: no reconozco el tipo por el nombre (tiene que empezar con ER, WEG o COMPRAS y el mes y año, o contener “Resumen”).`); return; }
+    if(porTipo[i.tipo]){ prob.push(`Hay dos archivos de tipo ${TNOM[i.tipo]}: ${porTipo[i.tipo].f.name} y ${f.name}.`); return; }
+    porTipo[i.tipo]={f,i}; });
+  const meses=[...new Set(['ER','WEG','COMPRAS'].filter(t=>porTipo[t]).map(t=>porTipo[t].i.periodo))];
+  if(meses.length>1) prob.push('Son de meses distintos: '+['ER','WEG','COMPRAS'].filter(t=>porTipo[t]).map(t=>`${TNOM[t]} de ${mesLargo(porTipo[t].i.periodo)}`).join(', ')+'.');
+  const periodo=meses.length===1?meses[0]:null;
+  const faltan=TIPOS.filter(t=>!porTipo[t]).map(t=>TNOM[t]+(periodo&&t!=='RESUMEN'?` de ${mesLargo(periodo)}`:''));
+  if(faltan.length) prob.push(`Falta${faltan.length>1?'n':''}: ${faltan.join(', ')}.`);
+  return {prob:[...new Set(prob)],porTipo,periodo};
+}
+function pintarSubida(){
+  const v=validarSubida(SUBIR.files); SUBIR.periodo=v.periodo; SUBIR.ok=!v.prob.length;
+  $('#chk-subir').innerHTML=SUBIR.files.length?TIPOS.map(t=>{const x=v.porTipo[t];
+    return `<li class="${x?'ok':'no'}"><b>${TNOM[t]}</b><span class="n">${x?esc(x.f.name):'falta'}</span></li>`}).join(''):'';
+  const msg=$('#msg-subir');
+  if(SUBIR.files.length&&v.prob.length){ msg.className='dlg-msg bad'; msg.hidden=false; msg.innerHTML=`<b>Todavía no se puede cargar:</b><ul>${v.prob.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`; }
+  else if(!SUBIR.enviando){ msg.hidden=true; }
+  const b=$('#btn-enviar'); b.disabled=!SUBIR.ok||SUBIR.enviando; b.textContent=SUBIR.ok?(SUBIR.confirmar?`Sí, reemplazar ${mesLargo(v.periodo)}`:`Cargar ${mesLargo(v.periodo)}`):'Cargar';
+}
+function abrirSubida(files){
+  SUBIR={files:files||[],periodo:null,ok:false,enviando:false,confirmar:false}; $('#msg-subir').hidden=true; pintarSubida();
+  const d=$('#dlg-subir'); if(!d.open){ try{ d.showModal(); }catch(e){ d.setAttribute('open',''); } }
+}
+async function enviarSubida(){
+  if(!SUBIR.ok||SUBIR.enviando) return;
+  SUBIR.enviando=true; pintarSubida();
+  const msg=$('#msg-subir'); msg.className='dlg-msg wait'; msg.hidden=false;
+  msg.innerHTML=`Cargando <b>${esc(mesLargo(SUBIR.periodo))}</b>… puede tardar hasta un minuto. No cierres esta ventana.`;
+  const fd=new FormData(); SUBIR.files.forEach(f=>fd.append('archivos',f,f.name));
+  if(SUBIR.confirmar) fd.append('confirmar_reemplazo','si');
+  const ac=('AbortController' in window)?new AbortController():null; const t=setTimeout(()=>ac&&ac.abort(),180000);
+  let r=null, err='';
+  try{ const resp=await fetch('subir',{method:'POST',body:fd,signal:ac?ac.signal:undefined,credentials:'same-origin'});
+    const txt=await resp.text(); try{ r=JSON.parse(txt); }catch(e){ err=resp.status===401?'La sesión venció: recargá la página e ingresá de nuevo.':resp.status===413?`Los archivos superan los ${MAX_MB} MB permitidos.`:`El servidor respondió con un error (${resp.status}).`; } }
+  catch(e){ err=e.name==='AbortError'?'La carga tardó demasiado y se cortó. Revisá en “Estado de los datos” si el mes quedó cargado antes de volver a intentar.':'No se pudo conectar con el servidor. Revisá la conexión y probá de nuevo.'; }
+  finally{ clearTimeout(t); SUBIR.enviando=false; }
+  if(r&&r.requiere_confirmacion){
+    SUBIR.confirmar=true; pintarSubida();
+    msg.className='dlg-msg warn'; msg.hidden=false; msg.innerHTML=`<b>${esc(r.mensaje)}</b>`;
+  }else if(r&&r.ok){
+    msg.className='dlg-msg ok';
+    const otros=(r.otros_meses||[]).length?`<br>También cambiaron otros meses:<ul>${r.otros_meses.map(o=>`<li><b>${esc(o.mes)}</b>: ${esc(o.cambios.join('; '))}</li>`).join('')}</ul>`:'';
+    msg.innerHTML=`<b>${esc(r.mensaje)}</b>${otros}${(r.avisos||[]).length?`<br>Para revisar:<ul>${r.avisos.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}`;
+    SUBIR.confirmar=false; SUBIR.files=[]; $('#chk-subir').innerHTML=''; $('#btn-enviar').disabled=true; $('#btn-enviar').textContent='Cargar';
+    await cargarDelServidor(); toast(r.mensaje);
+  }else{
+    SUBIR.confirmar=false; msg.className='dlg-msg bad';
+    msg.innerHTML=`<b>${esc((r&&r.mensaje)||'No se cargó el mes.')}</b>${(r&&r.problemas||[err]).filter(Boolean).length?`<ul>${(r?r.problemas:[err]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
+    pintarSubida(); msg.hidden=false;
+  }
+}
+$('#btn-subir').hidden=!PUBLICADO;
+$('#btn-subir').onclick=()=>abrirSubida([]);
+$('#btn-elegir').onclick=()=>$('#file-xls').click();
+$('#file-xls').addEventListener('change',e=>{ if(e.target.files.length){ SUBIR.files=[...e.target.files]; SUBIR.confirmar=false; $('#msg-subir').hidden=true; pintarSubida(); } e.target.value=''; });
+$('#btn-enviar').onclick=enviarSubida;
+$('#dlg-subir').addEventListener('cancel',e=>{ if(SUBIR.enviando) e.preventDefault(); });
+$('#btn-cancelar').addEventListener('click',e=>{ if(SUBIR.enviando) e.preventDefault(); });
+function applyTheme(t){ document.documentElement.setAttribute('data-theme',t); $('#btn-theme').textContent=t==='dark'?'Modo claro':'Modo oscuro'; }
+$('#btn-theme').onclick=()=>{const t=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light'; applyTheme(t); store('theme',t); render();};
+let rz,lastW=0; new ResizeObserver(es=>{const w=es[0].contentRect.width; if(Math.abs(w-lastW)<2) return; lastW=w; clearTimeout(rz); rz=setTimeout(render,120)}).observe(document.querySelector('main'));
+
+/* Inicio: tema, estado guardado, datos del servidor (si existe /data) o datos de ejemplo integrados */
+(async function init(){
+  try{ document.getElementById('nojs').remove(); }catch(e){}
+  applyTheme(store('theme')||'dark');
+  try{ const s=JSON.parse(store('state')||'null');
+    if(s&&typeof s==='object'){ for(const k of ['A','Acustom','B','Bcustom','basis','mode','minM2']){ if(k in s) ST[k]=s[k]; }
+      if(!Array.isArray(ST.Acustom)) ST.Acustom=[]; if(!Array.isArray(ST.Bcustom)) ST.Bcustom=[];
+      if(!['real','fx'].includes(ST.basis)) ST.basis='real'; if(!['avg','tot'].includes(ST.mode)) ST.mode='avg';
+      if(![0,50,100,250,500].includes(ST.minM2)) ST.minM2=100;
+      DATA.estadoGuardado=true; } }catch(e){}
+  const h=(location.hash||'').slice(1); if(['resumen','clientes','pareto','articulos','m2','equilibrio','evolucion','datos'].includes(h)) ST.sec=h;
+  // 1) Arranca al instante con los datos que trae el propio archivo
+  try{ DATA.Q=JSON.parse($('#json-calidad').textContent); }catch(e){ DATA.Q=null; }
+  boot($('#csv-detalle').textContent.trim(),$('#csv-resumen').textContent.trim(),'Archivos de Luciano (ER, WEG, COMPRAS y Resumen)');
+  // 2) Si está publicado en un servidor con carpeta data/, la usa (más nueva). Con límite de tiempo: nunca deja la página esperando.
+  if(!PUBLICADO) return;
+  await cargarDelServidor();
+})();
+async function cargarDelServidor(){
+  const get=(u)=>{ const ac=('AbortController' in window)?new AbortController():null; const t=setTimeout(()=>ac&&ac.abort(),4000);
+    return fetch(u,{cache:'no-store',signal:ac?ac.signal:undefined}).then(r=>r.ok?r.text():'').catch(()=>'').finally(()=>clearTimeout(t)); };
+  try{
+    const [ta,tb]=await Promise.all([get('data/detalle_clientes_articulos.csv'),get('data/resumen_mensual.csv')]);
+    let ok=false; try{ ok=kindOf(parseCSV(ta))==='detalle'&&kindOf(parseCSV(tb))==='resumen'; }catch(e){}
+    if(!ok){ DATA.srvFail=true; DATA.srvIntentado=true; render(); return; }   // se siguen mostrando los datos del archivo, con aviso
+    let q=null; try{ const tq=await get('data/calidad.json'); q=tq?JSON.parse(tq):null; }catch(e){}
+    DATA.Q=q; DATA.D=[]; DATA.E={}; DATA.srvFail=false; DATA.srvIntentado=true; boot(ta,tb,'Datos del servidor');
+  }catch(e){ DATA.srvFail=true; DATA.srvIntentado=true; try{ render(); }catch(_){} }
+}
+</script>
+
+</body>
+</html>

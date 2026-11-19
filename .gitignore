@@ -1,0 +1,7 @@
+datos/
+servidor/htpasswd
+servidor/htpasswd.bak
+servidor/.env
+__pycache__/
+*.pyc
+.DS_Store

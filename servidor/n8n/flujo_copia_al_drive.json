@@ -1,0 +1,126 @@
+{
+ "name": "DAO · copia al Drive",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "dao-copiar-drive",
+    "responseMode": "onReceived",
+    "options": {}
+   },
+   "id": "8ee7463d-cea7-5531-be06-4ad9a0e5e6d5",
+   "name": "Pedido del servicio de carga",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    0
+   ],
+   "webhookId": "416d673c-2b46-58e8-bbb3-4bf0384f60cf",
+   "notes": "Lo llama el servicio de carga (cargador) cuando un mes se cargó con \"Subir Excel del mes\". Solo es accesible por la red interna de Docker."
+  },
+  {
+   "parameters": {
+    "fieldToSplitOut": "body.archivos",
+    "options": {}
+   },
+   "id": "32cc4e89-59a3-5052-ac9c-5b55a5e915d3",
+   "name": "Separar archivos",
+   "type": "n8n-nodes-base.splitOut",
+   "typeVersion": 1,
+   "position": [
+    260,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "read",
+    "fileSelector": "={{ $json.ruta }}",
+    "options": {}
+   },
+   "id": "dbe6ce78-f73e-5b8c-a807-ba69c047d936",
+   "name": "Leer el archivo",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1.1,
+   "position": [
+    520,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "name": "={{ $('Separar archivos').item.json.nombre }}",
+    "driveId": {
+     "__rl": true,
+     "value": "My Drive",
+     "mode": "list",
+     "cachedResultName": "My Drive"
+    },
+    "folderId": {
+     "__rl": true,
+     "value": "PEGAR_ID_DE_LA_CARPETA_DE_DRIVE",
+     "mode": "id"
+    },
+    "options": {}
+   },
+   "id": "77295079-a12c-5cea-83d5-a1c8e6001392",
+   "name": "Subir al Drive",
+   "type": "n8n-nodes-base.googleDrive",
+   "typeVersion": 3,
+   "position": [
+    780,
+    0
+   ],
+   "credentials": {
+    "googleDriveOAuth2Api": {
+     "id": "ELEGIR_CREDENCIAL",
+     "name": "Google Drive (DAO)"
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Pedido del servicio de carga": {
+   "main": [
+    [
+     {
+      "node": "Separar archivos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Separar archivos": {
+   "main": [
+    [
+     {
+      "node": "Leer el archivo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Leer el archivo": {
+   "main": [
+    [
+     {
+      "node": "Subir al Drive",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": false,
+ "pinData": {},
+ "meta": {
+  "templateCredsSetupCompleted": false
+ }
+}

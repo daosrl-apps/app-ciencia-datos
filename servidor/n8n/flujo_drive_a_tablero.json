@@ -1,0 +1,297 @@
+{
+ "name": "DAO · Drive → tablero",
+ "nodes": [
+  {
+   "parameters": {
+    "pollTimes": {
+     "item": [
+      {
+       "mode": "everyX",
+       "value": 15,
+       "unit": "minutes"
+      }
+     ]
+    },
+    "triggerOn": "specificFolder",
+    "folderToWatch": {
+     "__rl": true,
+     "value": "PEGAR_ID_DE_LA_CARPETA_DE_DRIVE",
+     "mode": "id"
+    },
+    "event": "fileCreated",
+    "options": {}
+   },
+   "id": "29818b69-0b26-5c1d-8eb8-6cf8d6d31542",
+   "name": "Archivo nuevo en el Drive",
+   "type": "n8n-nodes-base.googleDriveTrigger",
+   "typeVersion": 1,
+   "position": [
+    0,
+    0
+   ],
+   "credentials": {
+    "googleDriveOAuth2Api": {
+     "id": "ELEGIR_CREDENCIAL",
+     "name": "Google Drive (DAO)"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "pollTimes": {
+     "item": [
+      {
+       "mode": "everyX",
+       "value": 15,
+       "unit": "minutes"
+      }
+     ]
+    },
+    "triggerOn": "specificFolder",
+    "folderToWatch": {
+     "__rl": true,
+     "value": "PEGAR_ID_DE_LA_CARPETA_DE_DRIVE",
+     "mode": "id"
+    },
+    "event": "fileUpdated",
+    "options": {}
+   },
+   "id": "6f206878-cea4-598d-8406-ae3053b0a667",
+   "name": "Archivo modificado en el Drive",
+   "type": "n8n-nodes-base.googleDriveTrigger",
+   "typeVersion": 1,
+   "position": [
+    0,
+    200
+   ],
+   "credentials": {
+    "googleDriveOAuth2Api": {
+     "id": "ELEGIR_CREDENCIAL",
+     "name": "Google Drive (DAO)"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "download",
+    "fileId": {
+     "__rl": true,
+     "value": "={{ $json.id }}",
+     "mode": "id"
+    },
+    "options": {}
+   },
+   "id": "b4b43960-c912-5d8f-8644-b702c7cf5081",
+   "name": "Bajar el archivo",
+   "type": "n8n-nodes-base.googleDrive",
+   "typeVersion": 3,
+   "position": [
+    260,
+    100
+   ],
+   "credentials": {
+    "googleDriveOAuth2Api": {
+     "id": "ELEGIR_CREDENCIAL",
+     "name": "Google Drive (DAO)"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "write",
+    "fileName": "=/datos/excel/{{ $binary.data.fileName }}",
+    "dataPropertyName": "data",
+    "options": {}
+   },
+   "id": "166733b3-1f17-5871-93af-f2d6d649343c",
+   "name": "Guardar en /datos/excel",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1.1,
+   "position": [
+    520,
+    100
+   ]
+  },
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "triggerAtHour": 6,
+       "triggerAtMinute": 45
+      }
+     ]
+    }
+   },
+   "id": "a58318bd-5c9c-5692-8eab-f092f671761d",
+   "name": "Todos los días 6:45",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    520,
+    360
+   ]
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "http://cargador:8000/procesar",
+    "options": {
+     "timeout": 300000
+    }
+   },
+   "id": "d8e7c046-cfa4-5aa1-aa56-c610cad4d4d9",
+   "name": "Correr el pipeline",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    780,
+    200
+   ],
+   "executeOnce": true,
+   "notes": "Corre el pipeline completo. Un mes se carga solo si están sus 4 archivos; si no, queda pendiente y el tablero lo muestra."
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "3cd0c0a1-a6e8-589e-b311-3fc83909a4a3",
+       "leftValue": "={{ ($json.errores_nuevos || []).length }}",
+       "rightValue": 0,
+       "operator": {
+        "type": "number",
+        "operation": "gt"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "5ab0be1b-c59c-5f07-b2ed-ca32e290aaab",
+   "name": "¿Error nuevo?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1040,
+    200
+   ]
+  },
+  {
+   "parameters": {
+    "fromEmail": "PEGAR_REMITENTE",
+    "toEmail": "PEGAR_MAILS_DEL_EQUIPO",
+    "subject": "Tablero DAO: un archivo no se pudo cargar",
+    "emailFormat": "text",
+    "text": "={{ $json.errores_nuevos.map(e => e.archivo + ': ' + e.error).join('\\n') }}\n\nEl detalle está en la franja roja del tablero.",
+    "options": {}
+   },
+   "id": "98eba504-19c3-5aae-97e7-921b2ab5163b",
+   "name": "Avisar al equipo",
+   "type": "n8n-nodes-base.emailSend",
+   "typeVersion": 2.1,
+   "position": [
+    1300,
+    120
+   ],
+   "disabled": true,
+   "notes": "Activar después de configurar una credencial SMTP."
+  }
+ ],
+ "connections": {
+  "Archivo nuevo en el Drive": {
+   "main": [
+    [
+     {
+      "node": "Bajar el archivo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Archivo modificado en el Drive": {
+   "main": [
+    [
+     {
+      "node": "Bajar el archivo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Bajar el archivo": {
+   "main": [
+    [
+     {
+      "node": "Guardar en /datos/excel",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Guardar en /datos/excel": {
+   "main": [
+    [
+     {
+      "node": "Correr el pipeline",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Todos los días 6:45": {
+   "main": [
+    [
+     {
+      "node": "Correr el pipeline",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Correr el pipeline": {
+   "main": [
+    [
+     {
+      "node": "¿Error nuevo?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "¿Error nuevo?": {
+   "main": [
+    [
+     {
+      "node": "Avisar al equipo",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    []
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "timezone": "America/Argentina/Cordoba"
+ },
+ "active": false,
+ "pinData": {},
+ "meta": {
+  "templateCredsSetupCompleted": false
+ }
+}

@@ -1,0 +1,63 @@
+# Tablero DAO SRL en Contabo (https://cienciadedatos.daosrl.com.ar) — Nginx (tablero) + servicio de carga (inicio de sesión y carga de los Excel)
+# El HTTPS y el dominio los atiende el Nginx de app-dao-ops (de Luciano), que reenvía a 172.20.0.1:8088 (ver DESPLIEGUE.md).
+# Instalación: ver servidor/DESPLIEGUE.md. Se levanta desde la carpeta servidor/ con:  docker compose up -d --build
+#
+# Carpetas de datos (fuera del repositorio, se crean en la instalación):
+#   ../datos/excel           Excel de Luciano (llegan por "Subir Excel del mes")
+#   ../datos/base            base histórica por mes  ← INCLUIR EN EL BACKUP
+#   ../datos/tablero/data    CSV y calidad.json que lee el tablero
+
+name: dao-tablero          # nombre del conjunto en el servidor (contenedores dao-tablero-web-1 y dao-tablero-cargador-1)
+
+services:
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${PUERTO_TABLERO:-172.20.0.1:8088}:80"   # solo dentro del servidor: lo alcanza el Nginx de app-dao-ops, no internet
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../tablero:/srv/tablero:ro
+      - ../datos/tablero/data:/srv/data:ro
+    depends_on:
+      - cargador
+
+  cargador:
+    build:
+      context: ..
+      dockerfile: servidor/Dockerfile.cargador
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      DAO_ENTRADA: /datos/excel
+      DAO_BASE: /datos/base
+      DAO_SALIDA: /datos/tablero/data
+      N8N_COPIA_URL: ""          # vacío: no copia al Drive (ver el bloque de n8n al final)
+      DAO_HTPASSWD: /config/htpasswd   # usuarios y contraseñas del tablero (se lee en cada inicio de sesión)
+      TZ: America/Argentina/Cordoba
+    volumes:
+      - ../datos:/datos
+      - .:/config:ro                   # la carpeta entera (no solo el archivo): así ve los cambios aunque se edite con sed o nano
+    # sin "ports": solo lo alcanza Nginx (/subir) por la red interna
+
+# ── Etapa siguiente: Drive con n8n (hoy apagado, ver "Sumar el Drive más adelante" en DESPLIEGUE.md) ──
+# Para activarlo: descomentar este bloque y poner en N8N_COPIA_URL http://n8n:5678/webhook/dao-copiar-drive
+#
+#  n8n:
+#    image: n8nio/n8n:2.45.5
+#    restart: unless-stopped
+#    ports:
+#      - "127.0.0.1:5678:5678"   # el editor de n8n NO queda abierto a internet: se entra con un túnel SSH
+#    environment:
+#      GENERIC_TIMEZONE: America/Argentina/Cordoba
+#      N8N_LISTEN_ADDRESS: 0.0.0.0     # sin esto n8n no arranca en servidores sin IPv6
+#      TZ: America/Argentina/Cordoba
+#      N8N_RESTRICT_FILE_ACCESS_TO: /datos/excel
+#      N8N_SECURE_COOKIE: "false"  # se usa por túnel SSH en http://localhost:5678
+#      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Definí N8N_ENCRYPTION_KEY en servidor/.env}
+#    volumes:
+#      - n8n_datos:/home/node/.n8n
+#      - ../datos/excel:/datos/excel
+#
+#volumes:
+#  n8n_datos:
