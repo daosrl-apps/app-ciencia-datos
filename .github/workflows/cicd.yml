@@ -78,6 +78,6 @@ jobs:
 
             # Reconstruir y levantar contenedores del tablero
             cd /opt/dao/servidor
-            docker compose up -d --build
+            docker compose up -d --build --force-recreate
 
             echo "¡Tablero Ciencia de Datos desplegado con éxito en https://cienciadedatos.daosrl.com.ar!"

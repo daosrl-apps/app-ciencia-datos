@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tablero DAO SRL</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0b0c" id="meta-theme-color">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tablero DAO">
 <script>if(/^https?:$/.test(location.protocol)) document.documentElement.classList.add('bloqueado');</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
@@ -319,8 +327,18 @@ body{font-size:15px;line-height:1.47;font-variant-numeric:tabular-nums;letter-sp
 .link{color:var(--accent);font-size:13.5px;border-radius:6px}
 .link:hover{opacity:.7}
 /* Controles */
-select,input[type=search]{background-color:var(--fill);border:0;border-radius:9px;font-size:13.5px;padding-block:7px}
+select,input[type=search]{background-color:var(--fill);color:var(--fg);border:0;border-radius:9px;font-size:13.5px;padding-block:7px}
 select:hover{background-color:var(--fill)}
+select option,select optgroup{background-color:var(--surface);color:var(--fg);font-weight:400}
+select optgroup{font-weight:600;color:var(--muted)}
+:root:not([data-theme="light"]) select{color-scheme:dark;background-color:#2c2c2e;color:#f5f5f7}
+:root:not([data-theme="light"]) select:hover{background-color:#363638}
+:root:not([data-theme="light"]) select option{background-color:#1c1c1e;color:#f5f5f7}
+:root:not([data-theme="light"]) select optgroup{background-color:#141416;color:#98989d}
+:root[data-theme="light"] select{color-scheme:light;background-color:#e9e9ed;color:#1d1d1f}
+:root[data-theme="light"] select:hover{background-color:#dfdfe4}
+:root[data-theme="light"] select option{background-color:#ffffff;color:#1d1d1f}
+:root[data-theme="light"] select optgroup{background-color:#f5f5f7;color:#6e6e73}
 input[type=search]{padding-inline:12px;width:240px}
 input[type=search]::placeholder{color:var(--muted)}
 .seg{background:var(--fill);border:0;border-radius:9px;padding:2px}
@@ -735,6 +753,7 @@ html.bloqueado .top,html.bloqueado main,html.bloqueado .pie{display:none}
         <button class="icon-btn" id="btn-datos" type="button" title="Estado de los datos"><span class="long">Estado de los datos</span><span class="short">Datos</span></button>
         <button class="icon-btn" id="btn-load" type="button" hidden title="Cargar detalle_clientes_articulos.csv y/o resumen_mensual.csv (uso del equipo)"><span class="long">Cargar datos</span><span class="short">Cargar</span></button>
         <button class="icon-btn primary" id="btn-subir" type="button" hidden title="Subir los 4 Excel del mes: ER, WEG, COMPRAS y Resumen"><span class="long">Subir Excel del mes</span><span class="short">Subir</span></button>
+        <button class="icon-btn" id="btn-instalar" type="button" hidden title="Instalar Tablero DAO como aplicación en tu teléfono o PC"><span class="long">Instalar App</span><span class="short">App</span></button>
         <button class="icon-btn" id="btn-salir" type="button" hidden title="Cerrar sesión">Salir</button>
         <button class="icon-btn ico" id="btn-theme" type="button" aria-label="Cambiar tema"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg></button>
       </div>
@@ -1732,8 +1751,46 @@ $('#file-xls').addEventListener('change',e=>{ if(e.target.files.length){ SUBIR.f
 $('#btn-enviar').onclick=enviarSubida;
 $('#dlg-subir').addEventListener('cancel',e=>{ if(SUBIR.enviando) e.preventDefault(); });
 $('#btn-cancelar').addEventListener('click',e=>{ if(SUBIR.enviando) e.preventDefault(); });
-function applyTheme(t){ document.documentElement.setAttribute('data-theme',t); const et=t==='dark'?'Pasar a modo claro':'Pasar a modo oscuro'; $('#btn-theme').title=et; $('#btn-theme').setAttribute('aria-label',et); }
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  const et=t==='dark'?'Pasar a modo claro':'Pasar a modo oscuro';
+  $('#btn-theme').title=et; $('#btn-theme').setAttribute('aria-label',et);
+  const mt=document.getElementById('meta-theme-color'); if(mt) mt.setAttribute('content',t==='dark'?'#0b0b0c':'#ffffff');
+}
 $('#btn-theme').onclick=()=>{const t=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light'; applyTheme(t); store('theme',t); render();};
+
+/* ════════════════════════ Instalación como App (PWA) ════════════════════════ */
+let PWA_PROMPT=null;
+const ES_STANDALONE=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+const ES_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+if(PUBLICADO&&'serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  PWA_PROMPT=e;
+  if(!ES_STANDALONE) $('#btn-instalar').hidden=false;
+});
+window.addEventListener('appinstalled',()=>{
+  PWA_PROMPT=null;
+  $('#btn-instalar').hidden=true;
+  toast('¡Aplicación instalada con éxito en tu dispositivo!');
+});
+if(PUBLICADO&&ES_IOS&&!ES_STANDALONE){
+  $('#btn-instalar').hidden=false;
+}
+$('#btn-instalar').onclick=async()=>{
+  if(PWA_PROMPT){
+    PWA_PROMPT.prompt();
+    const res=await PWA_PROMPT.userChoice;
+    if(res&&res.outcome==='accepted'){ $('#btn-instalar').hidden=true; }
+    PWA_PROMPT=null;
+  }else if(ES_IOS){
+    toast('En iPhone/iPad: tocá el botón Compartir de Safari (abajo) y elegí "Agregar a inicio".');
+  }else{
+    toast('Desde el menú del navegador (⋮ arriba a la derecha), elegí "Instalar aplicación" o "Agregar a la pantalla principal".');
+  }
+};
 let rz,lastW=0; new ResizeObserver(es=>{const w=es[0].contentRect.width; if(!lastW){ lastW=w; return; } if(Math.abs(w-lastW)<2) return; lastW=w; clearTimeout(rz); rz=setTimeout(render,120)}).observe(document.querySelector('main'));
 
 /* Inicio: tema, estado guardado, datos del servidor (si existe /data) o datos de ejemplo integrados */
